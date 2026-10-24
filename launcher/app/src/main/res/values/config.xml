@@ -16,7 +16,15 @@
     </string-array>
 
     <!-- Apps pinned to the dock row at the bottom, in this order. Missing apps are skipped. -->
-    <string-array name="dock_apps">
+    < <string-array name="dock_apps">
+        <item>com.netflix.ninja</item>
+        <item>com.google.android.youtube.tv</item>
+        <item>io.gh.reisxd.tizentube.cobalt</item>
+        <item>org.drive_hunter</item>
+        <item>com.kick.mobile</item>
+        <item>com.xiaomi.mitv.tvmanager</item>
+        <item>ma.snrt.forja.android.app</item>
+    </string-array>">
         <item>com.netflix.ninja</item>
         <item>com.amazon.amazonvideo.livingroom</item>
         <item>com.google.android.youtube.tv</item>
@@ -303,7 +311,7 @@
 
     <!-- Tiles per row in the grid; the dock always has this many slots. Tiles are 180dp wide at 4 columns and
          shrink to fit from 5 up (about 144dp at 5, 117dp at 6 on a 1080p TV). -->
-    <integer name="columns">4</integer>
+    <integer name="columns">7</integer>
 
     <!-- Basic motion is on; advanced effects are opt-in in the launcher's own Settings screen. -->
     <bool name="animations">true</bool>
