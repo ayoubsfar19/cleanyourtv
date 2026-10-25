@@ -54,6 +54,7 @@ final class Scene {
 
     Scene(Context context) {
         this.context = context;
+        TizenNightService.recoverVolume(context);
         options = Options.load(context);
         root = new FrameLayout(context);
         root.setBackgroundColor(Color.BLACK);
@@ -137,6 +138,15 @@ final class Scene {
                 }
             }
         }, labels);
+        night.setEntryAction(() -> {
+            try {
+                context.startActivity(new android.content.Intent(context, NightAccessActivity.class)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP));
+            } catch (RuntimeException unavailable) {
+                android.widget.Toast.makeText(context, "Impossible d’ouvrir le mode nuit", android.widget.Toast.LENGTH_SHORT).show();
+            }
+        });
         updateDate();
     }
 

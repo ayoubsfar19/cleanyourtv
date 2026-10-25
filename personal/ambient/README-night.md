@@ -1,47 +1,49 @@
-# Native Night videos
+# Mode nuit avec TizenTube — preview 3.3
 
-Night has four slots in the selected order. Original videos are **not included**. Supply your original MP4 files, or direct HTTPS URLs that serve those MP4 files. A YouTube watch page is not a native video source; this helper does not download or extract YouTube videos.
+Le mode nuit utilise TizenTube Cobalt deja installe (`io.gh.reisxd.tizentube.cobalt`) pour lire directement les quatre liens choisis. Aucun fichier MP4 ni telechargement du film entier n'est necessaire. L'ouverture directe du premier lien a ete confirmee par le proprietaire du televiseur. La couche de widgets et les commandes de cette version doivent encore etre testees avec la vraie telecommande.
 
-| Slot/file | Selected video ID | Label |
-|---|---|---|
-| `1.mp4` | `7_Wbmy79wxQ` | The Art Corner 1 |
-| `2.mp4` | `BVdHrTfO2PE` | The Art Corner 2 |
-| `3.mp4` | `yTRHheKoVhY` | Bedroom R&B 1 |
-| `4.mp4` | `BUeCNBg_qYk` | Bedroom R&B 2 |
+## Mise a jour
 
-Install the updated preview APK first. Put `sync-night-videos.ps1` beside `adb.exe` in `platform-tools`, create a `night-videos` folder beside the script, and put the chosen files there using the names above. Each file must be nonempty and at most 1 GiB. Files are copied unchanged: no conversion, trimming or audio replacement. Choose formats your TV can decode, such as an original H.264/AAC MP4.
-
-From PowerShell in `platform-tools`, replace `<tv ip>` with the TV address:
+Placez `photos-football-preview.apk` a cote de `adb.exe`, ouvrez PowerShell dans ce dossier et remplacez `<tvip>` par l'adresse du televiseur :
 
 ```powershell
-.\adb.exe connect '<tv ip>:5555'
-powershell -ExecutionPolicy Bypass -File .\sync-night-videos.ps1 -TvHost '<tv ip>'
+.\adb.exe connect <tvip>:5555
+.\adb.exe -s <tvip>:5555 install -r .\photos-football-preview.apk
+.\adb.exe -s <tvip>:5555 shell appops set com.gathin.ambienttv SYSTEM_ALERT_WINDOW allow
+.\adb.exe -s <tvip>:5555 shell am start -n com.gathin.ambienttv/.SlideshowActivity
 ```
 
-Use `-Folder 'C:\path\to\night-videos'` for another source folder. Add `-ValidateOnly` to check files and configuration without contacting the TV. The script updates only the supplied numbered videos and Night configuration; it never deletes absent videos, modifies original files or photos, changes the launcher, or selects a screensaver. Reopen the preview and choose a Night video after syncing. Missing sources are shown as unavailable until supplied.
+Le mode nuit utilise l'autorisation **Afficher par-dessus les autres applications**. Elle peut aussi etre accordee dans la page ouverte depuis le bouton lune. Le service d'accessibilite **Retour vers les photos**, deja utilise par la configuration precedente, doit etre actif pour retirer automatiquement la couche quand vous quittez TizenTube. Si necessaire, l'ecran du mode nuit ouvre les reglages d'accessibilite : activez uniquement ce service, en conservant les autres. Il observe les noms de fenetre et ne lit pas leur contenu.
 
-For streaming, create `night-videos/night-videos.json` using this shape and replace each empty `url` with your direct HTTPS MP4 URL. Keep empty URLs for local files. The optional file accepts 1–4 unique IDs from the table; preserve each ID's numbered filename. All four slots remain visible: omitted IDs use their default numbered local file. A valid local file on the TV takes priority over its URL.
+Seul le compagnon Photos & Football est mis a jour. Les photos et le choix HOME ne sont pas modifies par ces commandes.
 
-```json
-{
-  "version": 1,
-  "videos": [
-    { "id": "7_Wbmy79wxQ", "title": "The Art Corner 1", "file": "1.mp4", "url": "" },
-    { "id": "BVdHrTfO2PE", "title": "The Art Corner 2", "file": "2.mp4", "url": "" },
-    { "id": "yTRHheKoVhY", "title": "Bedroom R&B 1", "file": "3.mp4", "url": "" },
-    { "id": "BUeCNBg_qYk", "title": "Bedroom R&B 2", "file": "4.mp4", "url": "" }
-  ]
-}
+## Telecommande
+
+Dans le diaporama, **Haut** selectionne la lune, puis **OK** ouvre le mode nuit. **Gauche/Droite** gardent leur fonction photo precedente/suivante.
+
+Les widgets conservent leur style : meteo en haut a gauche, Wi-Fi en haut a droite, heure et date en bas a droite. Le lecteur TizenTube reste une application distincte sous cette couche.
+
+Dans le mode nuit, **OK** ou une direction affiche les commandes. **Playlist** ouvre les quatre choix; selectionner une video ferme la liste. **Lumiere tamisee / Lumiere normale** modifie uniquement la couche sombre au-dessus de la video. Les commandes se masquent apres cinq secondes.
+
+**Retour** ferme d'abord la liste si elle est ouverte; sinon il revient aux photos. Le bouton **Photos** fait de meme. **Home**, le passage a une autre application, la veille du televiseur ou l'arret du service d'accessibilite retirent la couche. Le niveau sonore est reduit seulement s'il depasse le seuil nocturne, puis restaure si vous ne l'avez pas change avec la telecommande. Un historique local permet de recuperer ce reglage si le processus est interrompu et que vous rouvrez les photos.
+
+## Videos choisies
+
+1. `7_Wbmy79wxQ` — The Art Corner 1
+2. `BVdHrTfO2PE` — The Art Corner 2
+3. `yTRHheKoVhY` — Bedroom R&B 1
+4. `BUeCNBg_qYk` — Bedroom R&B 2
+
+La qualite et le comportement de fin de lecture restent ceux de TizenTube. Cette version ne force pas la 4K et ne pretend pas avoir mesure la resolution de sortie. Aucun compte, historique de visionnage ou flux prive n'est extrait.
+
+## Verification sur le televiseur
+
+Verifiez que la video continue avec les widgets visibles, que Playlist change reellement la video, que la luminosite bascule, que Retour retrouve les photos et que Home retire toute la couche. Les tests automatiques couvrent les etats de sortie et la configuration; ils ne remplacent pas cet essai de lecture sur le televiseur.
+
+En cas de couche qui ne disparaitrait pas, retirez l'autorisation depuis les reglages ou avec :
+
+```powershell
+.\adb.exe -s <tvip>:5555 shell appops set com.gathin.ambienttv SYSTEM_ALERT_WINDOW deny
 ```
 
-Then run the same sync command. A configuration-only sync works without local MP4 files. Configuration is limited to 65536 bytes, titles to 100 characters without control characters, and URLs to 4096 characters without embedded credentials. Direct URLs are streamed by the TV; the script does not download them or test remote playback. Use a URL the TV can access without browser sign-in. Streaming avoids storing the whole video on the TV; large local uploads need free TV storage for both staging and the app copy. Private URLs remain in the local configuration and the app's Night configuration, so keep those files private.
-
-## Remote controls
-
-On the photo screensaver, Left/Right keep changing photos. Press Up to select the small moon, then OK to enter Night mode. The clock/date, weather and Wi-Fi stay visible over the video.
-
-In Night mode, OK or a direction reveals the controls. **Playlist** opens the four choices; selecting one closes the list immediately. **Lumière tamisée / Lumière normale** toggles a dark overlay over the video without changing TV-wide picture settings. Controls hide after five seconds. **Photos** or Back restores the slideshow; when the playlist is open, Back closes the playlist first.
-
-Playback repeats the selected file. It uses the original stream with no re-encoding or replacement audio, and a low player-local audio level; the system volume is not changed. Leaving Night, Home, or stopping the screensaver releases playback and audio focus. A missing file or incompatible codec displays a recoverable message with Back to photos.
-
-The native player requests the source video resolution on its own SurfaceView layer beneath the widgets. Actual 4K output depends on a genuine 4K source, the TV decoder, display mode and compositor. This build has not been verified on the owner's physical TV and does not claim measured 4K output. The supplied YouTube watch links have not been downloaded: direct access to them was blocked in the preparation environment.
+Le mode nuit peut ensuite etre reactive avec `allow`. La configuration MP4 native de la preview 3.2 reste dans les sources mais n'est pas requise pour ce mode TizenTube.

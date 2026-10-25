@@ -46,6 +46,7 @@ final class NightMode {
     private FrameLayout modal;
     private TextView[] choices;
     private View previousPhotoFocus;
+    private Runnable entryAction;
     private boolean running, active, detached, available = true, dimmed = true;
     private int selected, modalSelection, toolbarSelection, capturedKey;
 
@@ -95,7 +96,7 @@ final class NightMode {
         moon.setClickable(true);
         moon.setDefaultFocusHighlightEnabled(false);
         moon.setOnFocusChangeListener((v, focus) -> v.invalidate());
-        moon.setOnClickListener(v -> { if (active) showControls(); else enter(); });
+        moon.setOnClickListener(v -> { if (active) showControls(); else requestEntry(); });
         FrameLayout.LayoutParams moonPosition = new FrameLayout.LayoutParams(dp(48), dp(36),
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         moonPosition.bottomMargin = dp(16);
@@ -163,6 +164,7 @@ final class NightMode {
         root.removeView(toolbar);
         root.removeView(status);
         previousPhotoFocus = null;
+        entryAction = null;
     }
 
     /** The host hides entry while another full-screen page, such as football, owns the remote. */
@@ -173,6 +175,18 @@ final class NightMode {
 
     boolean isActive() { return active; }
     boolean ownsPhotoKeys() { return active || moon.hasFocus(); }
+
+    /** Optional host handoff: opening another activity leaves this controller inactive. */
+    void setEntryAction(Runnable action) { entryAction = action; }
+
+    /** Enter directly for a host that already owns the playback surface or service overlay. */
+    void enterFromHost(int index) {
+        if (index < 0 || index >= labels.length) {
+            throw new IllegalArgumentException("Unknown night playlist index: " + index);
+        }
+        selected = index;
+        enter();
+    }
 
     /** Supply loading or native-player errors; an empty value removes the message. */
     void setStatus(String message) {
@@ -202,7 +216,7 @@ final class NightMode {
             if (moon.hasFocus()) {
                 if (isConfirm(key)) {
                     capturedKey = key;
-                    enter();
+                    requestEntry();
                     return true;
                 }
                 if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
@@ -255,6 +269,12 @@ final class NightMode {
         if (modal != null) closePlaylist(true);
         else exit();
         return true;
+    }
+
+    private void requestEntry() {
+        if (!running || detached || !available || active) return;
+        if (entryAction != null) entryAction.run();
+        else enter();
     }
 
     private void enter() {
