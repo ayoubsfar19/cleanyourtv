@@ -1,0 +1,61 @@
+# Photos & Football — preview
+
+Independent Android TV app, package `com.gathin.ambienttv`, based on cleanyourtv's photo-screensaver. It does not replace or change the launcher. Personal images remain on the computer and TV.
+
+The photo slideshow keeps a compact clock/date and weather. The bottom **Football** button opens a separate turquoise/purple sports page. La Liga fixtures, results and live scores come from ESPN. Score polling runs every 30 seconds only while the slideshow/screensaver is visible; goal banners last 10 seconds. The source can lag the live broadcast. New sessions establish a baseline and do not replay old goals. This preview has no cross-app overlay or background service.
+
+## Install on Windows
+
+Extract the download into `platform-tools`, beside `adb.exe`, with these files together:
+
+- `photos-football-preview.apk`
+- `install-preview.ps1`
+- `sync-photos.ps1`
+- `photos/` containing the existing pictures
+
+Run from that folder in PowerShell (replace `<tv ip>`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-preview.ps1 -TvHost '<tv ip>'
+```
+
+The script validates pictures, connects to the TV, backs up the exact previous screensaver settings, and writes `restore-screensaver.ps1` **before any installation or setting change**. It installs the preview, copies pictures through the app's protected file provider, sets 30 seconds per photo and a 5-minute idle trigger, then opens the preview. Keep `screensaver-before.json` and the restore script. They contain the TV address and should remain private.
+
+If the APK reports a signature mismatch, stop and report the error; do not uninstall or delete app data to work around it.
+
+## Change pictures later
+
+Put JPG, JPEG, PNG or WebP files in `photos/`, then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\sync-photos.ps1 -TvHost '<tv ip>' -Replace
+```
+
+Up to 100 files, each between 1 byte and 10 MB, using ASCII letters/digits/dot/dash/underscore in filenames. `-Replace` removes stale files **only from this app's copy**, after all new pictures have been written successfully. It never changes the original `photos/` folder or another screensaver's files. Omit `-Replace` to keep extra pictures already in this preview. No APK rebuild or reinstall is needed.
+
+## Remote
+
+- On the pictures: **OK** opens Football.
+- On the sports page: arrows navigate, **OK** selects a match, **Back** returns to photos.
+- From photos: **Back** exits the manual preview/dream; **Home** returns to the launcher.
+- **Menu** opens the original photo settings in the manual preview.
+
+## Restore
+
+From `platform-tools`, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\restore-screensaver.ps1
+```
+
+The script restores the precise saved settings, deleting settings that originally had no value. It closes only this preview. It preserves photos, accounts, networking, ADB, all installed apps and launcher settings. It does not uninstall anything.
+
+## Build
+
+JDK 17, Android SDK platform 34/build-tools 34.0.0, from the repository root:
+
+```sh
+sh personal/ambient/gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease
+```
+
+APK: `personal/ambient/app/build/outputs/apk/release/app-release.apk`. The generated download copies it as `photos-football-preview.apk`. This preview must still be checked on the real TV with its real remote.
