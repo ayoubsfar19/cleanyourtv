@@ -391,7 +391,10 @@ final class Slides {
             options.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(file.getPath(), options);
             int w = options.outWidth, h = options.outHeight;
-            if (w <= 0 || h <= 0) return null;
+            if (w <= 0 || h <= 0) {
+                android.util.Log.w("AmbientPhotos", "Unreadable photo: " + file.getName());
+                return null;
+            }
             int orientation = orientation(file);
             int[] oriented = Media.orientationDimensions(w, h, orientation);
             int sample = Media.sampleSize(oriented[0], oriented[1], width, height);
@@ -406,7 +409,10 @@ final class Slides {
             }
             options.inPreferredConfig = Bitmap.Config.RGB_565;
             decoded = BitmapFactory.decodeFile(file.getPath(), options);
-            if (decoded == null) return null;
+            if (decoded == null) {
+                android.util.Log.w("AmbientPhotos", "Photo decoder returned no image: " + file.getName());
+                return null;
+            }
             Matrix transform = new Matrix();
             switch (orientation) {
                 case ExifInterface.ORIENTATION_FLIP_HORIZONTAL: transform.setScale(-1f, 1f); break;
@@ -426,11 +432,17 @@ final class Slides {
                 if (upright != decoded) decoded.recycle();
                 decoded = upright;
             }
-            Bitmap gpu = decoded.copy(Bitmap.Config.HARDWARE, false);
-            if (gpu == null) return decoded;
-            decoded.recycle();
-            return gpu;
+            try {
+                Bitmap gpu = decoded.copy(Bitmap.Config.HARDWARE, false);
+                if (gpu == null) return decoded;
+                decoded.recycle();
+                return gpu;
+            } catch (RuntimeException | OutOfMemoryError unavailableGpuCopy) {
+                android.util.Log.w("AmbientPhotos", "Using software photo: " + file.getName());
+                return decoded;
+            }
         } catch (Exception | OutOfMemoryError failure) {
+            android.util.Log.w("AmbientPhotos", "Cannot decode photo: " + file.getName(), failure);
             if (decoded != null && !decoded.isRecycled()) decoded.recycle();
             return null;
         }

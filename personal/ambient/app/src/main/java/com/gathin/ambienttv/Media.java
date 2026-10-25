@@ -118,10 +118,11 @@ final class Media {
         return width > 0 && height > 0 && (long) width * height <= MAX_PIXELS;
     }
 
-    /** The largest power-of-two sample size that still covers the screen in both directions. */
+    /** Prefer screen coverage while keeping large phone portraits inside the decode-memory budget. */
     static int sampleSize(int width, int height, int screenW, int screenH) {
         int sample = 1;
         while (width / (sample * 2) >= screenW && height / (sample * 2) >= screenH) sample *= 2;
+        while ((long) (width / sample) * (height / sample) > MAX_PIXELS) sample *= 2;
         return sample;
     }
 

@@ -46,9 +46,34 @@ public class MediaNavigationTest {
 
     @Test public void rotatedPhotoSamplingUsesPortraitDisplayBounds() {
         int[] oriented = Media.orientationDimensions(4000, 3000, 6);
-        assertEquals(1, Media.sampleSize(oriented[0], oriented[1], 1920, 1080));
-        assertArrayEquals(new int[]{3000, 1920},
-                Media.coverScale(oriented[0], oriented[1], 1920, 1080));
+        int sample = Media.sampleSize(oriented[0], oriented[1], 1920, 1080);
+        assertEquals(2, sample);
+        assertTrue(Media.accepted(oriented[0] / sample, oriented[1] / sample));
+        // CENTER_CROP may upscale a safe decode instead of rejecting the original photograph.
+        assertNull(Media.coverScale(oriented[0] / sample, oriented[1] / sample, 1920, 1080));
+    }
+
+    @Test public void fortyEightMegapixelPortraitStaysWithinDecodeBudget() {
+        int sample = Media.sampleSize(6000, 8000, 1920, 1080);
+        assertEquals(4, sample);
+        assertTrue(Media.accepted(6000 / sample, 8000 / sample));
+    }
+
+    @Test public void twelveMegapixelLandscapeKeepsExistingSample() {
+        int sample = Media.sampleSize(4000, 3000, 1920, 1080);
+        assertEquals(2, sample);
+        assertTrue(Media.accepted(4000 / sample, 3000 / sample));
+    }
+
+    @Test public void normalPortraitUsesSameSafeBudgetAsExifPortrait() {
+        int sample = Media.sampleSize(3000, 4000, 1920, 1080);
+        assertEquals(2, sample);
+        assertTrue(Media.accepted(3000 / sample, 4000 / sample));
+    }
+
+    @Test public void smallPortraitKeepsOriginalResolution() {
+        assertEquals(1, Media.sampleSize(900, 1200, 1920, 1080));
+        assertTrue(Media.accepted(900, 1200));
     }
 
     @Test public void emptyFolderHasNoSelection() {

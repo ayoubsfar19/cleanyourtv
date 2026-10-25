@@ -74,3 +74,7 @@ Details are loaded on demand with a five-minute cache, separate from live pollin
 ## Photo navigation and orientation (2.4)
 
 Right/Left on the photo layer move to the next/previous file in filename order and wrap at the ends. Manual changes reset the automatic interval. Rapid presses supersede stale decode/fade callbacks; arrows inside football retain their normal navigation. The loader reads EXIF orientation (including mirrored variants), transforms the decoded bitmap upright, then applies full-screen crop. Portrait photos are not rotated merely because they are tall. Original files are never rewritten.
+
+## Large portrait photos (2.5)
+
+Sampling now increases when the image would exceed the decode-pixel budget. A 12 MP portrait previously kept at sample=1 and rejected now uses sample=2, then fills the screen normally. A failed GPU copy falls back to the upright software bitmap. Original files are not rewritten; unreadable images are logged under AmbientPhotos for diagnosis.
