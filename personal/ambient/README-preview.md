@@ -35,7 +35,7 @@ Up to 100 files, each between 1 byte and 10 MB, using ASCII letters/digits/dot/d
 
 ## Remote
 
-- On the pictures: **OK** opens Football.
+- On the pictures: **Right** shows the next photo, **Left** shows the previous one, wrapping at either end. Each manual change restarts the automatic photo interval. **OK** opens Football. Inside football the arrows remain normal navigation.
 - On the sports page: arrows navigate, **OK** selects a match, **Back** returns to photos.
 - From cleanyourtv Home: **Back** opens the photos immediately.
 - From photos: **Back** exits the manual preview/dream; **Home** returns to the launcher.
@@ -70,3 +70,7 @@ Six pages: fixtures, live matches, results, standings, goalscorers and clubs, wi
 Data adapters use ESPN for Spanish fixtures/details and Kooora for independent league data and Moroccan coverage. The latter also backs up the Spanish schedule if the first service fails. Provider identities stay internal and are not printed in sports footers or settings. There is no SofaScore integration or claim of unrestricted coverage. A competition page may expose only the current round; other dates explicitly fail instead of being reported as an empty calendar. Missing live/final scores are never replaced with 0–0.
 
 Details are loaded on demand with a five-minute cache, separate from live polling. Stale cached data and connection errors are identified. No browsing, cookies, logins, personal-photo uploads or new background polling were added. The app remains an independent screensaver; the original launcher is unchanged.
+
+## Photo navigation and orientation (2.4)
+
+Right/Left on the photo layer move to the next/previous file in filename order and wrap at the ends. Manual changes reset the automatic interval. Rapid presses supersede stale decode/fade callbacks; arrows inside football retain their normal navigation. The loader reads EXIF orientation (including mirrored variants), transforms the decoded bitmap upright, then applies full-screen crop. Portrait photos are not rotated merely because they are tall. Original files are never rewritten.

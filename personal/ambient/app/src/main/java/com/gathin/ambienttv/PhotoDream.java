@@ -17,6 +17,7 @@ public class PhotoDream extends DreamService {
     }
 
     @Override public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (scene != null && scene.photoKey(event)) return true;
         if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_BACK) {
             if (event.getAction() == android.view.KeyEvent.ACTION_UP) {
                 if (scene == null || !scene.back()) finish();

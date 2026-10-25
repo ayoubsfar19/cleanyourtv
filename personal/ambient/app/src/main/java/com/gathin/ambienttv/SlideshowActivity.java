@@ -37,6 +37,7 @@ public class SlideshowActivity extends Activity {
     }
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        if (scene != null && scene.photoKey(event)) return true;
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
             if (event.getAction() == KeyEvent.ACTION_UP && (scene == null || !scene.back())) finish();
             return true;

@@ -38,6 +38,7 @@ final class Scene {
     private final Prints prints;
     private final SportsHub sports;
     private boolean running;
+    private int photoArrowKey;
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
@@ -111,6 +112,7 @@ final class Scene {
 
     void stop() {
         running = false;
+        photoArrowKey=0;
         sports.stop();
         handler.removeCallbacksAndMessages(null);
         if (slides != null) slides.stop();
@@ -126,6 +128,19 @@ final class Scene {
         for(int id : new int[]{R.id.time,R.id.date,R.id.ampm}) {
             ((android.widget.TextClock)root.findViewById(id)).setTimeZone(null);
         }
+    }
+
+    /** Consume photo arrows only on the ambient photo layer, never in the sports navigation. */
+    boolean photoKey(android.view.KeyEvent event) {
+        int key=event.getKeyCode();
+        if(key!=android.view.KeyEvent.KEYCODE_DPAD_LEFT && key!=android.view.KeyEvent.KEYCODE_DPAD_RIGHT)return false;
+        if(event.getAction()==android.view.KeyEvent.ACTION_UP && photoArrowKey==key){photoArrowKey=0;return true;}
+        if(event.getAction()!=android.view.KeyEvent.ACTION_DOWN)return false;
+        if(event.getRepeatCount()>0)return photoArrowKey==key;
+        if(!running || sports.isOpen() || slides==null)return false;
+        if(!slides.navigate(key==android.view.KeyEvent.KEYCODE_DPAD_RIGHT?1:-1))return false;
+        photoArrowKey=key;
+        return true;
     }
 
     boolean back() { return sports.back(); }

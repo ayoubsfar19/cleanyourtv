@@ -9,6 +9,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
+import android.media.ExifInterface;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
@@ -26,12 +27,13 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Full-screen mode: loops through the pictures sync.sh put in the app's pictures/ folder, in filename order,
- * each slowly zooming and drifting (Ken Burns) and crossfading into the next after seconds.txt (20 s by
+ * each slowly zooming and drifting (Ken Burns) and crossfading into the next after seconds.txt (30 s by
  * default). Two screen-sized pictures at most, held as GPU bitmaps. MP4 clips play once, muted and cropped to
  * fill the screen, on the hardware decoder (one player at a time), then the loop moves on.
  */
@@ -47,7 +49,12 @@ final class Slides {
     /** The month and year of the picture on screen, or null when the option is off. */
     private final TextView caption;
     private final View empty;
-    private ExecutorService decoder;
+    private ThreadPoolExecutor decoder;
+    private volatile long requestGeneration;
+    /** Last requested position, including requests still being decoded. Main thread only. */
+    private int requestedIndex;
+    private Runnable fadeCleanup;
+    private long pendingClipGeneration;
     private ImageView front;
     private ImageView back;
     private final TextureView video;
@@ -77,7 +84,7 @@ final class Slides {
                 surface = new Surface(texture);
                 File clip = pendingClip;
                 pendingClip = null;
-                if (clip != null && running) playVideo(clip);
+                if (clip != null && running) playVideo(clip, pendingClipGeneration);
             }
             @Override public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int w, int h) {}
             @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture texture) {
@@ -99,6 +106,7 @@ final class Slides {
         File dir = context.getExternalFilesDir(null);
         interval = Media.seconds(Photos.read(dir == null ? null : new File(dir, Media.SECONDS))) * 1000L;
         images = dir == null ? new ArrayList<>() : Media.list(new File(dir, Media.PICTURES));
+        requestedIndex = Media.indexOf(images, preferences.getString("image", ""));
         if (caption != null) caption.setAlpha(0f);
     }
 
@@ -114,13 +122,19 @@ final class Slides {
     void start() {
         running = true;
         empty.setVisibility(images.isEmpty() ? View.VISIBLE : View.GONE);
-        if (decoder == null) decoder = Executors.newSingleThreadExecutor();
+        if (decoder == null) decoder = new ThreadPoolExecutor(1, 1, 0L,
+                TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
         showNext();
     }
 
     void stop() {
         running = false;
-        handler.removeCallbacksAndMessages(null);
+        requestGeneration++;
+        handler.removeCallbacks(advance);
+        if (fadeCleanup != null) handler.removeCallbacks(fadeCleanup);
+        fadeCleanup = null;
+        // Let posted decode results run their generation check and recycle their bitmaps.
+        if (caption != null) caption.animate().withEndAction(null).cancel();
         if (decoder != null) decoder.shutdownNow();
         decoder = null;
         if (front != null) { cancel(front); release(front); }
@@ -129,48 +143,93 @@ final class Slides {
         stopVideo();
     }
 
-    /** Decodes the next picture off the main thread, then fades it in over the current one. */
+    /** Consumes directional keys while the slideshow is active, including pending decodes. */
+    boolean navigate(int direction) {
+        if (!running || images.isEmpty() || decoder == null) return false;
+        pendingClip = null;
+        stopVideo();
+        request(direction < 0 ? -1 : 1);
+        return true;
+    }
+
     private void showNext() {
+        request(1);
+    }
+
+    /** Each request supersedes both queued work and callbacks from the previous transition. */
+    private void request(int direction) {
         if (!running || images.isEmpty() || decoder == null) return;
+        final long token = ++requestGeneration;
+        handler.removeCallbacks(advance);
+        if (fadeCleanup != null) handler.removeCallbacks(fadeCleanup);
+        fadeCleanup = null;
+        pendingClip = null;
+        if (caption != null) caption.animate().withEndAction(null).cancel();
+        cancel(front);
+        cancel(back);
+        // Keep the current picture intact while the replacement is decoded. The other view is
+        // free for reuse, so an interrupted crossfade cannot later recycle the new picture.
+        if (front.getTag() instanceof Bitmap) front.setAlpha(1f);
+        back.setAlpha(0f);
+        release(back);
+        requestedIndex = Media.step(requestedIndex, images.size(), direction);
+        final int firstIndex = requestedIndex;
+        decoder.getQueue().clear();
         decoder.execute(() -> {
+            if (token != requestGeneration) return;
             Bitmap bitmap = null;
             File clip = null;
             String date = "";
-            // Skip unreadable pictures, but stop after one round so a folder of broken files doesn't spin.
-            for (int tries = 0; tries < images.size() && bitmap == null && clip == null; tries++) {
-                File file = Media.next(images, preferences.getString("image", ""));
-                preferences.edit().putString("image", file.getName()).apply();
-                if (Media.video(file.getName())) {
-                    clip = file;
-                } else {
+            int index = firstIndex;
+            for (int tries = 0; tries < images.size(); tries++) {
+                if (token != requestGeneration) return;
+                File file = images.get(index);
+                if (Media.video(file.getName())) clip = file;
+                else {
                     bitmap = decode(file);
                     if (bitmap != null && caption != null) date = Photos.dateOf(file);
                 }
+                if (token != requestGeneration) {
+                    if (bitmap != null) bitmap.recycle();
+                    return;
+                }
+                if (bitmap != null || clip != null) break;
+                index = Media.step(index, images.size(), direction);
             }
             Bitmap shown = bitmap;
             File playing = clip;
             String shownDate = date;
+            int shownIndex = index;
             handler.post(() -> {
-                if (!running) {
+                if (!running || token != requestGeneration) {
                     if (shown != null) shown.recycle();
                     return;
                 }
                 if (playing != null) {
-                    showCaption("");
-                    playVideo(playing);   // moves on when the clip ends
+                    requestedIndex = shownIndex;
+                    showCaption("", token);
+                    playVideo(playing, token);
                     return;
                 }
                 if (shown != null) {
-                    crossfade(shown);
-                    showCaption(shownDate);
+                    requestedIndex = shownIndex;
+                    crossfade(shown, token);
+                    preferences.edit().putString("image", images.get(shownIndex).getName()).apply();
+                    showCaption(shownDate, token);
                 }
-                // A single picture still drifts on: it fades into itself with a new zoom.
-                handler.postDelayed(advance, interval);
+                // Restart a full interval after the latest picture, or retry a broken folder later.
+                scheduleAdvance(interval, token);
             });
         });
     }
 
-    private void showCaption(String date) {
+    private void scheduleAdvance(long delay, long token) {
+        if (!running || token != requestGeneration) return;
+        handler.removeCallbacks(advance);
+        handler.postDelayed(advance, delay);
+    }
+
+    private void showCaption(String date, long token) {
         if (caption == null) return;
         caption.animate().cancel();
         if (date.isEmpty()) {
@@ -178,12 +237,13 @@ final class Slides {
             return;
         }
         caption.animate().alpha(0f).setDuration(FADE_MS / 2).withEndAction(() -> {
+            if (!running || token != requestGeneration) return;
             caption.setText(date);
             caption.animate().alpha(1f).setDuration(FADE_MS / 2).start();
         }).start();
     }
 
-    private void crossfade(Bitmap bitmap) {
+    private void crossfade(Bitmap bitmap, long token) {
         ImageView incoming = back;
         ImageView outgoing = front;
         back = outgoing;
@@ -213,18 +273,23 @@ final class Slides {
         incoming.setTag(R.id.animation, set);
         set.start();
         boolean afterClip = player != null;
-        handler.postDelayed(() -> {
+        fadeCleanup = () -> {
+            if (!running || token != requestGeneration) return;
+            fadeCleanup = null;
             cancel(outgoing);
             outgoing.setAlpha(0f);
             release(outgoing);
             if (afterClip) stopVideo();
-        }, FADE_MS + 100);
+        };
+        handler.postDelayed(fadeCleanup, FADE_MS + 100);
     }
 
     /** Fades the clip in over whatever shows now and plays it to the end (or loops a lone clip). */
-    private void playVideo(File clip) {
+    private void playVideo(File clip, long token) {
+        if (!running || token != requestGeneration) return;
         if (surface == null) {
             pendingClip = clip;
+            pendingClipGeneration = token;
             return;
         }
         boolean clipShowing = player != null;
@@ -237,36 +302,41 @@ final class Slides {
             mp.setSurface(surface);
             mp.setVolume(0f, 0f);
             mp.setLooping(images.size() == 1);
-            mp.setOnVideoSizeChangedListener((p, w, h) -> cover(w, h));
+            mp.setOnVideoSizeChangedListener((p, w, h) -> {
+                if (generation == clipGeneration && token == requestGeneration) cover(w, h);
+            });
             mp.setOnPreparedListener(p -> {
-                if (generation != clipGeneration || !running) return;
+                if (generation != clipGeneration || token != requestGeneration || !running) return;
                 p.start();
+                preferences.edit().putString("image", clip.getName()).apply();
                 video.bringToFront();
                 if (clipShowing) video.setAlpha(1f);
                 else video.animate().alpha(1f).setDuration(FADE_MS).start();
-                handler.postDelayed(() -> {
-                    if (generation != clipGeneration) return;
+                fadeCleanup = () -> {
+                    if (generation != clipGeneration || token != requestGeneration || !running) return;
+                    fadeCleanup = null;
                     for (ImageView view : new ImageView[] {front, back}) {
                         cancel(view);
                         view.setAlpha(0f);
                         release(view);
                     }
-                }, FADE_MS + 100);
+                };
+                handler.postDelayed(fadeCleanup, FADE_MS + 100);
             });
             mp.setOnCompletionListener(p -> {
-                if (generation == clipGeneration && running) showNext();
+                if (generation == clipGeneration && token == requestGeneration && running) showNext();
             });
             mp.setOnErrorListener((p, what, extra) -> {
-                if (generation == clipGeneration && running) {
+                if (generation == clipGeneration && token == requestGeneration && running) {
                     stopVideo();
-                    handler.postDelayed(advance, 1000);
+                    scheduleAdvance(1000, token);
                 }
                 return true;
             });
             mp.prepareAsync();
         } catch (Exception failure) {
             stopVideo();
-            handler.postDelayed(advance, 1000);
+            scheduleAdvance(1000, token);
         }
     }
 
@@ -305,31 +375,63 @@ final class Slides {
         if (old instanceof Bitmap) ((Bitmap) old).recycle();
     }
 
+    private static int orientation(File file) {
+        try {
+            return new ExifInterface(file.getPath()).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+        } catch (Exception ignored) {
+            return ExifInterface.ORIENTATION_NORMAL;
+        }
+    }
+
     private Bitmap decode(File file) {
+        Bitmap decoded = null;
         try {
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(file.getPath(), options);
             int w = options.outWidth, h = options.outHeight;
             if (w <= 0 || h <= 0) return null;
-            int sample = Media.sampleSize(w, h, width, height);
+            int orientation = orientation(file);
+            int[] oriented = Media.orientationDimensions(w, h, orientation);
+            int sample = Media.sampleSize(oriented[0], oriented[1], width, height);
             if (!Media.accepted(w / sample, h / sample)) return null;
             options.inJustDecodeBounds = false;
             options.inSampleSize = sample;
-            int[] scale = Media.coverScale(w / sample, h / sample, width, height);
+            int[] scale = Media.coverScale(oriented[0] / sample, oriented[1] / sample, width, height);
             if (scale != null) {
                 options.inScaled = true;
                 options.inDensity = scale[0];
                 options.inTargetDensity = scale[1];
             }
             options.inPreferredConfig = Bitmap.Config.RGB_565;
-            Bitmap decoded = BitmapFactory.decodeFile(file.getPath(), options);
+            decoded = BitmapFactory.decodeFile(file.getPath(), options);
             if (decoded == null) return null;
+            Matrix transform = new Matrix();
+            switch (orientation) {
+                case ExifInterface.ORIENTATION_FLIP_HORIZONTAL: transform.setScale(-1f, 1f); break;
+                case ExifInterface.ORIENTATION_ROTATE_180: transform.setRotate(180f); break;
+                case ExifInterface.ORIENTATION_FLIP_VERTICAL: transform.setScale(1f, -1f); break;
+                case ExifInterface.ORIENTATION_TRANSPOSE:
+                    transform.setRotate(90f); transform.postScale(-1f, 1f); break;
+                case ExifInterface.ORIENTATION_ROTATE_90: transform.setRotate(90f); break;
+                case ExifInterface.ORIENTATION_TRANSVERSE:
+                    transform.setRotate(-90f); transform.postScale(-1f, 1f); break;
+                case ExifInterface.ORIENTATION_ROTATE_270: transform.setRotate(270f); break;
+                default: break;
+            }
+            if (!transform.isIdentity()) {
+                Bitmap upright = Bitmap.createBitmap(decoded, 0, 0,
+                        decoded.getWidth(), decoded.getHeight(), transform, true);
+                if (upright != decoded) decoded.recycle();
+                decoded = upright;
+            }
             Bitmap gpu = decoded.copy(Bitmap.Config.HARDWARE, false);
             if (gpu == null) return decoded;
             decoded.recycle();
             return gpu;
         } catch (Exception | OutOfMemoryError failure) {
+            if (decoded != null && !decoded.isRecycled()) decoded.recycle();
             return null;
         }
     }

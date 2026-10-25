@@ -61,6 +61,7 @@ final class SportsHub {
     }
     void start(){active=true;generation++;goals=new MatchFeed.GoalGate();net=Executors.newSingleThreadExecutor();art=Executors.newSingleThreadExecutor();detailsNet=Executors.newFixedThreadPool(2);ui.post(poll);ui.post(weatherPoll);}
     void stop(){active=false;generation++;ui.removeCallbacksAndMessages(null);if(net!=null)net.shutdownNow();if(art!=null)art.shutdownNow();if(detailsNet!=null)detailsNet.shutdownNow();net=null;art=null;detailsNet=null;logos.evictAll();requests.clear();if(tone!=null){tone.release();tone=null;}pending.clear();showing=false;notice.setVisibility(View.GONE);closePage();}
+    boolean isOpen(){ return page!=null; }
     boolean back(){
         if(page==null)return false;
         if(!inspectors.isEmpty()){

@@ -70,11 +70,21 @@ final class Media {
 
     /** The file after {@code previous} by name, wrapping around; the first one when previous is gone. */
     static File next(List<File> files, String previous) {
-        if (files.isEmpty()) return null;
+        return files.isEmpty() ? null : files.get(step(indexOf(files, previous), files.size(), 1));
+    }
+
+    static int indexOf(List<File> files, String name) {
         for (int i = 0; i < files.size(); i++) {
-            if (files.get(i).getName().equals(previous)) return files.get((i + 1) % files.size());
+            if (files.get(i).getName().equals(name)) return i;
         }
-        return files.get(0);
+        return -1;
+    }
+
+    /** A missing previous selection starts at the first or last entry, depending on direction. */
+    static int step(int index, int count, int direction) {
+        if (count <= 0) return -1;
+        if (index < 0 || index >= count) return direction < 0 ? count - 1 : 0;
+        return (index + (direction < 0 ? count - 1 : 1)) % count;
     }
 
     /** seconds.txt's number, 5 to 3600; 20 when it is missing or not a number. */
@@ -96,6 +106,12 @@ final class Media {
         if (m == null || !m.find()) return null;
         int year = Integer.parseInt(m.group(1)), month = Integer.parseInt(m.group(2));
         return year >= 1900 && month >= 1 && month <= 12 ? new int[]{year, month} : null;
+    }
+
+    /** EXIF orientations 5 through 8 exchange the displayed width and height. */
+    static int[] orientationDimensions(int width, int height, int orientation) {
+        return orientation >= 5 && orientation <= 8
+                ? new int[]{height, width} : new int[]{width, height};
     }
 
     static boolean accepted(int width, int height) {
