@@ -1,0 +1,11 @@
+build/
+.gradle/
+local.properties
+app/build/
+photos/
+pictures/
+night-videos/
+night-videos.json
+*.apk
+screensaver-before.json
+restore-screensaver.ps1
