@@ -78,3 +78,13 @@ Right/Left on the photo layer move to the next/previous file in filename order a
 ## Large portrait photos (2.5)
 
 Sampling now increases when the image would exceed the decode-pixel budget. A 12 MP portrait previously kept at sample=1 and rejected now uses sample=2, then fills the screen normally. A failed GPU copy falls back to the upright software bitmap. Original files are not rewritten; unreadable images are logged under AmbientPhotos for diagnosis.
+
+## Android TV style and Home suggestions (3.0)
+
+A subtle bottom-centre chevron replaces the Football button. Down opens sports directly; Up from the sports header returns to photos, with arrows inside tables unchanged. A local Wi-Fi label appears top-right; Android may redact the SSID when location access/services are unavailable, in which case it says Wi-Fi connecté. No global location/network setting is changed.
+
+The separate Home preview (`com.gathin.personalhome`) reads app-published, searchable TV suggestions from this app's signature-protected provider. It does not receive arbitrary account histories. The companion requests READ_TV_LISTINGS, queries with no selection, and filters exact owner packages. Artwork is bounded and cached here; the launcher has no Internet permission. Private URIs and history are not logged or exported.
+
+If Netflix shares no rows, a dated public global Top10 feed supplies text cards; these open Netflix itself and are labelled Top10 mondial. This is neither personal history nor a verified deep link to a title. Apps without accessible shared rows show an honest app-entry card. Kick follows and TizenTube continuation are not invented or substituted with another app's account.
+
+The combined installer updates Photos, grants optional TV/Wi-Fi permissions, installs the separate Home preview and exports package counts only to `private/recommendation-status.txt`. Default Home is kept until `activate-personal-home.ps1` is run after physical testing. `restore-personal-home.ps1` restores the original Home component. Original launcher private settings are retained in the original app, not silently copied from inaccessible storage. The preview starts with the four dock apps from the provided screen: Netflix, TizenTube, Kick and TOD; other installed apps remain in the library/grid.

@@ -3,7 +3,8 @@
 param(
     [string]$TvHost = $env:TV_HOST,
     [string]$Folder = '',
-    [string]$Apk = ''
+    [string]$Apk = '',
+    [string]$HomeApk = ''
 )
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -96,6 +97,11 @@ Write-Host "Backup saved. Undo: $restore"
 $installed = Invoke-Tv -Arguments @('install','-r',$Apk)
 if ($installed -notmatch '(?m)^Success\s*$') { throw "Install did not report Success: $installed" }
 Invoke-Tv -Arguments @('shell','pm enable --user 0 com.gathin.ambienttv') | Out-Null
+foreach ($permission in @('android.permission.READ_TV_LISTINGS','android.permission.ACCESS_COARSE_LOCATION','android.permission.ACCESS_FINE_LOCATION')) {
+    try { Invoke-Tv -Arguments @('shell', "pm grant --user 0 com.gathin.ambienttv $permission") | Out-Null }
+    catch { Write-Warning "Optional permission unavailable: $permission. The preview can still open." }
+}
+
 & (Join-Path $scriptDir 'sync-photos.ps1') -TvHost $TvHost -Folder $Folder -Seconds 30 -Replace
 Invoke-Tv -Arguments @('shell','settings put secure screensaver_components com.gathin.ambienttv/.PhotoDream') | Out-Null
 Invoke-Tv -Arguments @('shell','settings put secure screensaver_enabled 1') | Out-Null
@@ -113,5 +119,11 @@ $mergedServices = $services -join ':'
 Invoke-Tv -Arguments @('shell', "settings put secure enabled_accessibility_services $mergedServices") | Out-Null
 Invoke-Tv -Arguments @('shell','settings put secure accessibility_enabled 1') | Out-Null
 Invoke-Tv -Arguments @('shell','am start -W -n com.gathin.ambienttv/.SlideshowActivity') | Out-Null
-Write-Host 'Ready: photo 30 s, idle 5 min. Football opens with OK; Back in Football returns to photos; Home returns to launcher; Back from Home opens photos.'
+Write-Host 'Ready: photo 30 s, idle 5 min. Down opens Football; Up from its header returns to photos; Left/Right change photos.'
 Write-Host 'Keep screensaver-before.json and restore-screensaver.ps1 for undo.'
+
+# The independently named Home preview is optional; it never replaces the original APK or default HOME.
+if ([string]::IsNullOrWhiteSpace($HomeApk)) { $HomeApk = Join-Path $scriptDir 'home-personnel-preview.apk' }
+if (Test-Path -LiteralPath $HomeApk -PathType Leaf) {
+    & (Join-Path $scriptDir 'install-home-preview.ps1') -TvHost $TvHost -Apk $HomeApk -GrantLocation
+}

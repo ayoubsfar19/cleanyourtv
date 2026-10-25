@@ -15,7 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Photo-first ambient scene; all sports navigation lives behind the Football button. */
+/** Photo-first ambient scene; Down or the discreet chevron opens sports navigation. */
 final class SportsHub {
     private static final String[] CODES={"esp.1","mor.1"}, LEAGUES={"LaLiga","Botola Pro"};
     private static final long DETAIL_TTL=5*60_000L;
@@ -23,9 +23,10 @@ final class SportsHub {
     private final FrameLayout root;
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final android.content.SharedPreferences cache;
-    private final TextView launch,weather,notice;
+    private final View launch;
+    private final TextView weather,notice;
     private FrameLayout page;
-    private LinearLayout main,rows,detail,dateBar;
+    private LinearLayout main,rows,detail,dateBar,mainHeader;
     private ScrollView matchScroll;
     private TextView footer,dateLabel,title,leagueButton;
     private ExecutorService net,art,detailsNet;
@@ -44,6 +45,7 @@ final class SportsHub {
     private MatchFeed.GoalGate goals=new MatchFeed.GoalGate();
     private final ArrayDeque<String> pending=new ArrayDeque<>();
     private boolean showing;
+    private int verticalKey;
     private long checked;
     private String failure="",selectedId="";
     private final Runnable poll=new Runnable(){public void run(){if(!active)return;refreshToday();ui.postDelayed(this,30_000);}};
@@ -52,16 +54,43 @@ final class SportsHub {
 
     SportsHub(Context context,FrameLayout container){
         c=context;root=container;cache=c.getSharedPreferences("ambient-scores",0);
-        launch=text("⚽  Football",15);launch.setPadding(dp(18),dp(10),dp(18),dp(10));focusable(launch);launch.setOnClickListener(v->open());
-        FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(-2,dp(44),Gravity.BOTTOM|Gravity.LEFT);lp.leftMargin=dp(32);lp.bottomMargin=dp(27);root.addView(launch,lp);launch.requestFocus();
+        launch=new View(c){
+            private final Paint ink=new Paint(Paint.ANTI_ALIAS_FLAG);
+            @Override protected void onDraw(Canvas canvas){
+                super.onDraw(canvas);ink.setColor(Color.WHITE);ink.setAlpha(hasFocus()?245:190);ink.setStyle(Paint.Style.STROKE);ink.setStrokeWidth(dp(2));ink.setStrokeCap(Paint.Cap.ROUND);ink.setStrokeJoin(Paint.Join.ROUND);ink.setShadowLayer(dp(2),0,dp(1),0x99000000);
+                float x=getWidth()/2f,y=getHeight()/2f;Path chevron=new Path();chevron.moveTo(x-dp(8),y-dp(3));chevron.lineTo(x,y+dp(4));chevron.lineTo(x+dp(8),y-dp(3));canvas.drawPath(chevron,ink);
+            }
+        };
+        launch.setContentDescription("Football");launch.setDefaultFocusHighlightEnabled(false);launch.setFocusable(true);launch.setClickable(true);launch.setOnFocusChangeListener((v,f)->v.invalidate());launch.setOnClickListener(v->open());
+        FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(dp(56),dp(36),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);lp.bottomMargin=dp(16);root.addView(launch,lp);launch.requestFocus();
         weather=text(cache.getString("weather","Oujda  ·  Météo…"),17);weather.setShadowLayer(dp(4),0,1,Color.BLACK);
         FrameLayout.LayoutParams wp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.LEFT);wp.leftMargin=dp(32);wp.topMargin=dp(28);root.addView(weather,wp);
         notice=text("",17);notice.setPadding(dp(20),dp(12),dp(20),dp(12));notice.setBackground(bg(0xF0182633,0xFFFFD44D,14));notice.setVisibility(View.GONE);
         FrameLayout.LayoutParams np=new FrameLayout.LayoutParams(dp(470),-2,Gravity.TOP|Gravity.CENTER_HORIZONTAL);np.topMargin=dp(24);root.addView(notice,np);
     }
     void start(){active=true;generation++;goals=new MatchFeed.GoalGate();net=Executors.newSingleThreadExecutor();art=Executors.newSingleThreadExecutor();detailsNet=Executors.newFixedThreadPool(2);ui.post(poll);ui.post(weatherPoll);}
-    void stop(){active=false;generation++;ui.removeCallbacksAndMessages(null);if(net!=null)net.shutdownNow();if(art!=null)art.shutdownNow();if(detailsNet!=null)detailsNet.shutdownNow();net=null;art=null;detailsNet=null;logos.evictAll();requests.clear();if(tone!=null){tone.release();tone=null;}pending.clear();showing=false;notice.setVisibility(View.GONE);closePage();}
+    void stop(){active=false;verticalKey=0;generation++;ui.removeCallbacksAndMessages(null);if(net!=null)net.shutdownNow();if(art!=null)art.shutdownNow();if(detailsNet!=null)detailsNet.shutdownNow();net=null;art=null;detailsNet=null;logos.evictAll();requests.clear();if(tone!=null){tone.release();tone=null;}pending.clear();showing=false;notice.setVisibility(View.GONE);closePage();}
     boolean isOpen(){ return page!=null; }
+    /** Capture the complete press only when changing between photos and the football page. */
+    boolean handleVerticalKey(KeyEvent event){
+        int key=event.getKeyCode();if(key!=KeyEvent.KEYCODE_DPAD_UP&&key!=KeyEvent.KEYCODE_DPAD_DOWN)return false;
+        if(event.getAction()==KeyEvent.ACTION_UP&&verticalKey==key){verticalKey=0;return true;}
+        if(event.getAction()!=KeyEvent.ACTION_DOWN)return false;
+        if(event.getRepeatCount()>0)return verticalKey==key;
+        if(!active)return false;
+        if(key==KeyEvent.KEYCODE_DPAD_DOWN&&page==null){verticalKey=key;open();return true;}
+        if(key==KeyEvent.KEYCODE_DPAD_UP&&page!=null&&atPageTop()){verticalKey=key;closePage();return true;}
+        return false;
+    }
+    private boolean atPageTop(){
+        View focused=page.findFocus();if(focused==null)return true;
+        View header=inspectors.isEmpty()?mainHeader:inspectorBox(inspectors.peekLast()).getChildAt(0);
+        if(inside(focused,header))return true;
+        View above=focused.focusSearch(View.FOCUS_UP);return above==null||!inside(above,page);
+    }
+    private boolean inside(View child,View parent){
+        for(View current=child;current!=null;){if(current==parent)return true;ViewParent owner=current.getParent();current=owner instanceof View?(View)owner:null;}return false;
+    }
     boolean back(){
         if(page==null)return false;
         if(!inspectors.isEmpty()){
@@ -72,7 +101,7 @@ final class SportsHub {
         }
         closePage();return true;
     }
-    private void closePage(){if(page==null)return;root.removeView(page);page=null;main=null;rows=null;detail=null;backdrop=null;inspectors.clear();inspectorFocus.clear();artGeneration++;launch.setVisibility(View.VISIBLE);launch.requestFocus();}
+    private void closePage(){if(page==null)return;root.removeView(page);page=null;main=null;mainHeader=null;rows=null;detail=null;backdrop=null;inspectors.clear();inspectorFocus.clear();artGeneration++;launch.setVisibility(View.VISIBLE);launch.requestFocus();}
     private int dp(float v){return Math.round(v*c.getResources().getDisplayMetrics().density);}
     private TextView text(String s,int size){TextView t=new TextView(c);t.setText(s);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setFontFeatureSettings("tnum");return t;}
     private GradientDrawable bg(int color,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=0)d.setStroke(dp(2),stroke);return d;}
@@ -84,7 +113,7 @@ final class SportsHub {
         page=new FrameLayout(c);page.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF008E99,0xFF143B55,0xFF572C79}));root.addView(page,new FrameLayout.LayoutParams(-1,-1));launch.setVisibility(View.GONE);
         backdrop=new ImageView(c);backdrop.setScaleType(ImageView.ScaleType.FIT_CENTER);backdrop.setAlpha(0.16f);page.addView(backdrop,new FrameLayout.LayoutParams(dp(430),dp(430),Gravity.RIGHT|Gravity.CENTER_VERTICAL));
         main=column();main.setPadding(dp(30),dp(22),dp(30),dp(16));page.addView(main,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout heading=new LinearLayout(c);heading.setGravity(Gravity.CENTER_VERTICAL);main.addView(heading,new LinearLayout.LayoutParams(-1,dp(44)));
+        LinearLayout heading=new LinearLayout(c);mainHeader=heading;heading.setGravity(Gravity.CENTER_VERTICAL);main.addView(heading,new LinearLayout.LayoutParams(-1,dp(44)));
         title=text(LEAGUES[league]+"  /  Football",24);title.setSingleLine(true);title.setEllipsize(TextUtils.TruncateAt.END);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         leagueButton=button(LEAGUES[1-league]+" ↔",this::switchLeague);heading.addView(leagueButton,new LinearLayout.LayoutParams(-2,dp(38)));heading.addView(button("Photos",this::closePage),new LinearLayout.LayoutParams(-2,dp(38)));
         HorizontalScrollView tabScroll=new HorizontalScrollView(c);tabScroll.setHorizontalScrollBarEnabled(false);main.addView(tabScroll,new LinearLayout.LayoutParams(-1,dp(44)));LinearLayout tabs=new LinearLayout(c);tabScroll.addView(tabs,new HorizontalScrollView.LayoutParams(-2,-1));

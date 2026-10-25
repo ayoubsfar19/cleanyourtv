@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -37,6 +38,7 @@ final class Scene {
     private final Slides slides;
     private final Prints prints;
     private final SportsHub sports;
+    private final WifiStatus wifi;
     private boolean running;
     private int photoArrowKey;
 
@@ -97,6 +99,14 @@ final class Scene {
         }
         bottomLine.bringToFront();
         sports = new SportsHub(context, root);
+        wifi = new WifiStatus(context);
+        FrameLayout.LayoutParams wifiPosition = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.RIGHT);
+        float density = context.getResources().getDisplayMetrics().density;
+        wifiPosition.topMargin = Math.round(28 * density);
+        wifiPosition.rightMargin = Math.round(32 * density);
+        root.addView(wifi.view, wifiPosition);
         updateDate();
     }
 
@@ -104,6 +114,7 @@ final class Scene {
         if (running) return;
         running = true;
         sports.start();
+        wifi.start();
         if (slides != null) slides.start();
         if (prints != null) prints.start();
         handler.post(tick);
@@ -114,6 +125,7 @@ final class Scene {
         running = false;
         photoArrowKey=0;
         sports.stop();
+        wifi.stop();
         handler.removeCallbacksAndMessages(null);
         if (slides != null) slides.stop();
         if (prints != null) prints.stop();
@@ -144,6 +156,10 @@ final class Scene {
     }
 
     boolean back() { return sports.back(); }
+
+    boolean verticalKey(android.view.KeyEvent event) {
+        return running && sports.handleVerticalKey(event);
+    }
 
     private void nudge() {
         if (bottomLine.getVisibility() != View.VISIBLE) return;
