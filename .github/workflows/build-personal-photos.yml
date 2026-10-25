@@ -2,6 +2,10 @@ name: Deliver Photos Football Preview
 on:
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: Preview release tag
+        required: false
+        default: photos-football-v2.0-preview
       bundle_base64:
         description: Public, signed preview ZIP (base64); never a signing key
         required: true
@@ -35,6 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          gh release upload photos-football-v2.0-preview photos-football-preview.zip photos-football-preview.apk SHA256SUMS.txt --clobber
-          gh release edit photos-football-v2.0-preview --draft=false --prerelease
+          gh release upload "$RELEASE_TAG" photos-football-preview.zip photos-football-preview.apk SHA256SUMS.txt --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease

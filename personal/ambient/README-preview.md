@@ -37,8 +37,11 @@ Up to 100 files, each between 1 byte and 10 MB, using ASCII letters/digits/dot/d
 
 - On the pictures: **OK** opens Football.
 - On the sports page: arrows navigate, **OK** selects a match, **Back** returns to photos.
+- From cleanyourtv Home: **Back** opens the photos immediately.
 - From photos: **Back** exits the manual preview/dream; **Home** returns to the launcher.
 - **Menu** opens the original photo settings in the manual preview.
+
+The optional Back shortcut is enabled by this preview installer at your request: it filters Back only while `com.gathin.tvhome/.MainActivity` is the current window. It uses Android's key-filter accessibility interface, without access to window contents. Home and Back inside other apps remain normal. Existing enabled helpers are preserved, and their original settings are included in the restore backup.
 
 ## Restore
 

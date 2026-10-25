@@ -42,24 +42,29 @@ function Invoke-Tv([string[]]$Arguments) {
 if ((Invoke-Tv -Arguments @('get-state')).Trim() -ne 'device') { throw 'TV is not connected or authorized.' }
 $backup = Join-Path $scriptDir 'screensaver-before.json'
 $restore = Join-Path $scriptDir 'restore-screensaver.ps1'
-if (-not (Test-Path -LiteralPath $backup)) {
-    $settings = @()
-    foreach ($entry in @(
-        @('secure','screensaver_components'),
-        @('secure','screensaver_enabled'),
-        @('secure','screensaver_activate_on_sleep'),
-        @('secure','screensaver_activate_on_dock'),
-        @('system','screen_off_timeout')
-    )) {
-        $value = (Invoke-Tv -Arguments @('shell', "settings get $($entry[0]) $($entry[1])")).Trim()
-        if ($value -notmatch '^[A-Za-z0-9_.,/:-]+$') { throw "Unexpected setting value for $($entry[1]); no changes made." }
-        $settings += [pscustomobject]@{ Scope=$entry[0]; Name=$entry[1]; Value=$value }
-    }
-    [pscustomobject]@{ Device=$serial; Settings=$settings } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $backup -Encoding UTF8
-} else {
+if (Test-Path -LiteralPath $backup) {
     $saved = Get-Content -LiteralPath $backup -Raw | ConvertFrom-Json
     if ($saved.Device -ne $serial) { throw 'The existing backup belongs to a different TV; keep it and use a new preview folder.' }
+} else {
+    $saved = [pscustomobject]@{ Device=$serial; Settings=@() }
 }
+# Upgrades preserve the first values and capture only newly managed settings before touching them.
+foreach ($entry in @(
+    @('secure','screensaver_components'),
+    @('secure','screensaver_enabled'),
+    @('secure','screensaver_activate_on_sleep'),
+    @('secure','screensaver_activate_on_dock'),
+    @('system','screen_off_timeout'),
+    @('secure','enabled_accessibility_services'),
+    @('secure','accessibility_enabled')
+)) {
+    $known = @($saved.Settings | Where-Object { $_.Scope -eq $entry[0] -and $_.Name -eq $entry[1] })
+    if ($known.Count -gt 0) { continue }
+    $value = (Invoke-Tv -Arguments @('shell', "settings get $($entry[0]) $($entry[1])")).Trim()
+    if ($value -notmatch '^[A-Za-z0-9_.,/:-]+$') { throw "Unexpected setting value for $($entry[1]); no changes made." }
+    $saved.Settings = @($saved.Settings) + [pscustomobject]@{ Scope=$entry[0]; Name=$entry[1]; Value=$value }
+}
+$saved | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $backup -Encoding UTF8
 # The restore file exists before installing or changing any setting. Re-running preserves the first backup.
 @'
 [CmdletBinding()]
@@ -96,6 +101,17 @@ Invoke-Tv -Arguments @('shell','settings put secure screensaver_components com.g
 Invoke-Tv -Arguments @('shell','settings put secure screensaver_enabled 1') | Out-Null
 Invoke-Tv -Arguments @('shell','settings put secure screensaver_activate_on_sleep 1') | Out-Null
 Invoke-Tv -Arguments @('shell','settings put system screen_off_timeout 300000') | Out-Null
+# Keep other accessibility helpers; this helper filters Back only on cleanyourtv's Home.
+$enabled = (Invoke-Tv -Arguments @('shell','settings get secure enabled_accessibility_services')).Trim()
+if ($enabled -eq 'null') { $enabled = '' }
+if ($enabled -and $enabled -notmatch '^[A-Za-z0-9_.,/:-]+$') { throw 'Unexpected accessibility service list; existing services were kept.' }
+$services = @($enabled -split ':' | Where-Object { $_ })
+if ($services -notcontains 'com.gathin.ambienttv/.HomeBackService' -and $services -notcontains 'com.gathin.ambienttv/com.gathin.ambienttv.HomeBackService') {
+    $services += 'com.gathin.ambienttv/.HomeBackService'
+}
+$mergedServices = $services -join ':'
+Invoke-Tv -Arguments @('shell', "settings put secure enabled_accessibility_services $mergedServices") | Out-Null
+Invoke-Tv -Arguments @('shell','settings put secure accessibility_enabled 1') | Out-Null
 Invoke-Tv -Arguments @('shell','am start -W -n com.gathin.ambienttv/.SlideshowActivity') | Out-Null
-Write-Host 'Ready: photo 30 s, idle 5 min. Football opens with OK; Back returns to photos; Home returns to launcher.'
+Write-Host 'Ready: photo 30 s, idle 5 min. Football opens with OK; Back in Football returns to photos; Home returns to launcher; Back from Home opens photos.'
 Write-Host 'Keep screensaver-before.json and restore-screensaver.ps1 for undo.'

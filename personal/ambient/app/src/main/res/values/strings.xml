@@ -17,4 +17,6 @@
     <string name="weather_ok">Location is on. The weather is updated every 30 minutes.</string>
     <string name="open_location_settings">Open location settings</string>
     <string name="preview">Aperçu</string>
+    <string name="home_back_label">Retour vers les photos</string>
+    <string name="home_back_description">Depuis l’accueil cleanyourtv, Retour ouvre les photos. Dans les autres applications, Retour reste inchangé. Seuls les noms de fenêtre sont utilisés, sans lire leur contenu.</string>
 </resources>

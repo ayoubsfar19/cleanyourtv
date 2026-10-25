@@ -17,4 +17,6 @@
     <string name="weather_ok">Locatie staat aan. Het weer wordt elke 30 minuten bijgewerkt.</string>
     <string name="open_location_settings">Locatie-instellingen openen</string>
     <string name="preview">Voorbeeld</string>
+    <string name="home_back_label">Terug naar foto’s</string>
+    <string name="home_back_description">Op het startscherm opent Terug de foto’s. In andere apps blijft Terug normaal werken. Leest geen scherminhoud.</string>
 </resources>
