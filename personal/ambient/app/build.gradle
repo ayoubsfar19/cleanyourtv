@@ -11,8 +11,8 @@ android {
         // DreamService with a hardware bitmap and TextureView: Android 8 and up, as the launcher.
         minSdk 26
         targetSdk 34
-        versionCode 22
-        versionName '2.2-preview'
+        versionCode 23
+        versionName '2.3-preview'
     }
 
     buildTypes {

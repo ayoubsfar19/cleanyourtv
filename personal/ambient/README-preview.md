@@ -62,3 +62,11 @@ sh personal/ambient/gradlew --no-daemon testReleaseUnitTest lintRelease assemble
 ```
 
 APK: `personal/ambient/app/build/outputs/apk/release/app-release.apk`. The generated download copies it as `photos-football-preview.apk`. This preview must still be checked on the real TV with its real remote.
+
+## Expanded football centre (2.3)
+
+Six pages: fixtures, live matches, results, standings, goalscorers and clubs, with LaLiga/Botola selection. OK on a match opens its available statistics, timeline, lineups and substitutes; club buttons open roster/profile/calendar details. Back goes to the preceding sports page, then photos. Other navigation and photo settings are retained.
+
+Data adapters use ESPN for Spanish fixtures/details and Kooora for independent league data and Moroccan coverage. The latter also backs up the Spanish schedule if the first service fails. Provider identities stay internal and are not printed in sports footers or settings. There is no SofaScore integration or claim of unrestricted coverage. A competition page may expose only the current round; other dates explicitly fail instead of being reported as an empty calendar. Missing live/final scores are never replaced with 0–0.
+
+Details are loaded on demand with a five-minute cache, separate from live polling. Stale cached data and connection errors are identified. No browsing, cookies, logins, personal-photo uploads or new background polling were added. The app remains an independent screensaver; the original launcher is unchanged.

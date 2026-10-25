@@ -4,10 +4,9 @@ on:
     inputs:
       release_tag:
         description: Preview release tag
-        required: false
-        default: photos-football-v2.0-preview
-      bundle_base64:
-        description: Public, signed preview ZIP (base64); never a signing key
+        required: true
+      bundle_blob_sha:
+        description: Git blob containing the tested public ZIP
         required: true
       bundle_sha256:
         description: SHA-256 of the tested ZIP
@@ -21,19 +20,25 @@ jobs:
     steps:
       - name: Verify tested public bundle
         env:
-          BUNDLE_BASE64: ${{ inputs.bundle_base64 }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUNDLE_BLOB_SHA: ${{ inputs.bundle_blob_sha }}
           BUNDLE_SHA256: ${{ inputs.bundle_sha256 }}
         run: |
           python3 - <<'PY'
-          import os,base64,hashlib,pathlib,zipfile
-          raw=base64.b64decode(os.environ['BUNDLE_BASE64'],validate=True)
+          import os,base64,hashlib,pathlib,zipfile,re,json,subprocess
+          sha=os.environ['BUNDLE_BLOB_SHA']
+          assert re.fullmatch('[0-9a-f]{40}',sha)
+          blob=json.loads(subprocess.check_output(['gh','api','repos/'+os.environ['GH_REPO']+'/git/blobs/'+sha]))
+          assert blob['encoding']=='base64'
+          raw=base64.b64decode(''.join(blob['content'].split()),validate=True)
           assert hashlib.sha256(raw).hexdigest()==os.environ['BUNDLE_SHA256']
           path=pathlib.Path('photos-football-preview.zip')
           path.write_bytes(raw)
           with zipfile.ZipFile(path) as z:
               for name in ['photos-football-preview.apk','SHA256SUMS.txt']:
                   pathlib.Path(name).write_bytes(z.read(name))
-          print('Tested bundle verified.')
+          print('Tested public bundle verified; no signing key included.')
           PY
       - name: Publish preview downloads
         env:
@@ -41,5 +46,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
+          [[ "$RELEASE_TAG" =~ ^photos-football-v[0-9.]+-preview$ ]]
           gh release upload "$RELEASE_TAG" photos-football-preview.zip photos-football-preview.apk SHA256SUMS.txt --clobber
           gh release edit "$RELEASE_TAG" --draft=false --prerelease

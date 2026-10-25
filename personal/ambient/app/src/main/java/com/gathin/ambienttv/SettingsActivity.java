@@ -52,7 +52,7 @@ public class SettingsActivity extends Activity {
         skySwitch.setEnabled(preferences.getBoolean(Options.PRINTS, false));
         list.addView(skySwitch);
         TextView info = new TextView(this);
-        info.setText("Météo Oujda · Open-Meteo · mise à jour 30 min\nFootball · ESPN · suivi 30 s pendant le diaporama");
+        info.setText("Météo Oujda · mise à jour 30 min\nFootball · suivi en direct pendant le diaporama");
         info.setPadding(dp(8), dp(16), 0, dp(8));
         list.addView(info);
 

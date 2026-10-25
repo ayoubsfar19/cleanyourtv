@@ -12,7 +12,7 @@ final class MatchFeed {
     /** Read the current device zone each time; never add a fixed hour or pin a country zone. */
     static ZoneId zone(){ return java.util.TimeZone.getDefault().toZoneId(); }
     static final class Match {
-        String id, home, away, homeLogo, awayLogo, state, clock, start, status;
+        String id, home, away, homeId, awayId, detailPath, homeLogo, awayLogo, state, clock, start, status;
         int hs, as;
         boolean live(){ return "in".equals(state); }
         boolean finished(){ return "post".equals(state); }
@@ -43,8 +43,11 @@ final class MatchFeed {
                 if(h==null||a==null)continue;
                 Match m=new Match();m.id=e.getString("id");m.start=e.getString("date");
                 m.state=type.optString("state");m.status=type.optString("name");m.clock=st.optString("displayClock","");
+                m.homeId=h.getJSONObject("team").optString("id");m.awayId=a.getJSONObject("team").optString("id");
+                m.detailPath=e.optString("detailPath","");
                 m.home=h.getJSONObject("team").getString("displayName");m.away=a.getJSONObject("team").getString("displayName");
                 m.homeLogo=h.getJSONObject("team").optString("logo");m.awayLogo=a.getJSONObject("team").optString("logo");
+                if((m.live()||m.finished())&&(h.isNull("score")||a.isNull("score")))continue;
                 m.hs=Integer.parseInt(h.optString("score","0"));m.as=Integer.parseInt(a.optString("score","0"));
                 if(m.hs<0||m.as<0)continue;
                 result.add(m);
@@ -52,8 +55,17 @@ final class MatchFeed {
         }
         result.sort(Comparator.comparing(m->m.start));return result;
     }
-    static String fetch(LocalDate date) throws Exception {
-        return get("https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates="+date.format(DateTimeFormatter.BASIC_ISO_DATE),2_000_000);
+    static String fetch(LocalDate date) throws Exception { return fetch(date,"esp.1"); }
+    static String fetch(LocalDate date,String league) throws Exception {
+        if ("mor.1".equals(league)) return KoooraFeed.scoreboard(date,1);
+        if (!"esp.1".equals(league)) throw new IOException("Compétition inconnue");
+        try {
+            String raw=get("https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates="+date.format(DateTimeFormatter.BASIC_ISO_DATE),2_000_000);
+            new JSONObject(raw).getJSONArray("events");
+            return raw;
+        } catch (IOException | JSONException unavailable) {
+            return KoooraFeed.scoreboard(date,0);
+        }
     }
     static String get(String url,int max) throws Exception {
         HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();
