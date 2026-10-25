@@ -2,16 +2,19 @@
 [CmdletBinding()]
 param(
     [string]$TvHost = $env:TV_HOST,
-    [string]$Folder = (Join-Path $PSScriptRoot 'photos'),
-    [string]$Apk = (Join-Path $PSScriptRoot 'photos-football-preview.apk')
+    [string]$Folder = '',
+    [string]$Apk = ''
 )
 $ErrorActionPreference = 'Stop'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($Folder)) { $Folder = Join-Path $scriptDir 'photos' }
+if ([string]::IsNullOrWhiteSpace($Apk)) { $Apk = Join-Path $scriptDir 'photos-football-preview.apk' }
 if (-not (Test-Path -LiteralPath $Apk -PathType Leaf)) { throw "APK not found: $Apk" }
-& (Join-Path $PSScriptRoot 'sync-photos.ps1') -Folder $Folder -ValidateOnly
+& (Join-Path $scriptDir 'sync-photos.ps1') -Folder $Folder -ValidateOnly
 if ([string]::IsNullOrWhiteSpace($TvHost) -or $TvHost -notmatch '^[A-Za-z0-9.:-]+$') { throw 'Supply -TvHost with the TV IP, optionally followed by :5555.' }
 $serial = if ($TvHost -match ':\d+$') { $TvHost } else { "${TvHost}:5555" }
 $adb = $null
-foreach ($candidate in @((Join-Path $PSScriptRoot 'adb.exe'), (Join-Path (Get-Location).Path 'adb.exe'))) {
+foreach ($candidate in @((Join-Path $scriptDir 'adb.exe'), (Join-Path (Get-Location).Path 'adb.exe'))) {
     if (Test-Path -LiteralPath $candidate -PathType Leaf) { $adb = $candidate; break }
 }
 if (-not $adb) { $cmd = Get-Command adb.exe -ErrorAction SilentlyContinue; if ($cmd) { $adb = $cmd.Source } }
@@ -37,8 +40,8 @@ function Invoke-Tv([string[]]$Arguments) {
     return $output
 }
 if ((Invoke-Tv -Arguments @('get-state')).Trim() -ne 'device') { throw 'TV is not connected or authorized.' }
-$backup = Join-Path $PSScriptRoot 'screensaver-before.json'
-$restore = Join-Path $PSScriptRoot 'restore-screensaver.ps1'
+$backup = Join-Path $scriptDir 'screensaver-before.json'
+$restore = Join-Path $scriptDir 'restore-screensaver.ps1'
 if (-not (Test-Path -LiteralPath $backup)) {
     $settings = @()
     foreach ($entry in @(
@@ -62,11 +65,12 @@ if (-not (Test-Path -LiteralPath $backup)) {
 [CmdletBinding()]
 param([string]$TvHost)
 $ErrorActionPreference = 'Stop'
-$saved = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'screensaver-before.json') -Raw | ConvertFrom-Json
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$saved = Get-Content -LiteralPath (Join-Path $scriptDir 'screensaver-before.json') -Raw | ConvertFrom-Json
 $serial = if ($TvHost) { if ($TvHost -match ':\d+$') { $TvHost } else { "${TvHost}:5555" } } else { $saved.Device }
 if ($serial -notmatch '^[A-Za-z0-9.:-]+$') { throw 'Invalid TV address.' }
 $adb = $null
-foreach ($candidate in @((Join-Path $PSScriptRoot 'adb.exe'),(Join-Path (Get-Location).Path 'adb.exe'))) {
+foreach ($candidate in @((Join-Path $scriptDir 'adb.exe'),(Join-Path (Get-Location).Path 'adb.exe'))) {
     if (Test-Path -LiteralPath $candidate -PathType Leaf) { $adb=$candidate; break }
 }
 if (-not $adb) { $cmd=Get-Command adb.exe -ErrorAction SilentlyContinue; if($cmd){$adb=$cmd.Source} }
@@ -87,7 +91,7 @@ Write-Host "Backup saved. Undo: $restore"
 $installed = Invoke-Tv -Arguments @('install','-r',$Apk)
 if ($installed -notmatch '(?m)^Success\s*$') { throw "Install did not report Success: $installed" }
 Invoke-Tv -Arguments @('shell','pm enable --user 0 com.gathin.ambienttv') | Out-Null
-& (Join-Path $PSScriptRoot 'sync-photos.ps1') -TvHost $TvHost -Folder $Folder -Seconds 30 -Replace
+& (Join-Path $scriptDir 'sync-photos.ps1') -TvHost $TvHost -Folder $Folder -Seconds 30 -Replace
 Invoke-Tv -Arguments @('shell','settings put secure screensaver_components com.gathin.ambienttv/.PhotoDream') | Out-Null
 Invoke-Tv -Arguments @('shell','settings put secure screensaver_enabled 1') | Out-Null
 Invoke-Tv -Arguments @('shell','settings put secure screensaver_activate_on_sleep 1') | Out-Null

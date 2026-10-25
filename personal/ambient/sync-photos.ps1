@@ -2,12 +2,14 @@
 [CmdletBinding()]
 param(
     [string]$TvHost = $env:TV_HOST,
-    [string]$Folder = (Join-Path $PSScriptRoot 'photos'),
+    [string]$Folder = '',
     [ValidateRange(5,3600)][int]$Seconds = 30,
     [switch]$Replace,
     [switch]$ValidateOnly
 )
 $ErrorActionPreference = 'Stop'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($Folder)) { $Folder = Join-Path $scriptDir 'photos' }
 if (-not (Test-Path -LiteralPath $Folder -PathType Container)) { throw "Photo folder not found: $Folder" }
 $files = @(Get-ChildItem -LiteralPath $Folder -File | Where-Object { $_.Extension -match '^\.(jpg|jpeg|png|webp)$' } | Sort-Object Name)
 if ($files.Count -eq 0) { throw 'No supported pictures in the photos folder. No settings were changed.' }
@@ -20,7 +22,7 @@ if ($ValidateOnly) { Write-Host "$($files.Count) pictures ready."; return }
 if ([string]::IsNullOrWhiteSpace($TvHost) -or $TvHost -notmatch '^[A-Za-z0-9.:-]+$') { throw 'Supply -TvHost with the TV IP, optionally followed by :5555.' }
 $serial = if ($TvHost -match ':\d+$') { $TvHost } else { "${TvHost}:5555" }
 $adb = $null
-foreach ($candidate in @((Join-Path $PSScriptRoot 'adb.exe'), (Join-Path (Get-Location).Path 'adb.exe'))) {
+foreach ($candidate in @((Join-Path $scriptDir 'adb.exe'), (Join-Path (Get-Location).Path 'adb.exe'))) {
     if (Test-Path -LiteralPath $candidate -PathType Leaf) { $adb = $candidate; break }
 }
 if (-not $adb) { $cmd = Get-Command adb.exe -ErrorAction SilentlyContinue; if ($cmd) { $adb = $cmd.Source } }
