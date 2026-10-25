@@ -13,12 +13,11 @@ Use Windows PowerShell 5.1 or later. Replace `<tvip>` with the TV address, autho
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install-preview.ps1 -TvHost '<tvip>'
-powershell -ExecutionPolicy Bypass -File .\install-home-preview.ps1 -TvHost '<tvip>'
 ```
 
-The photos installer configures the companion screensaver. The Home installer saves the original HOME component in `private/home-before.json` before installation and preserves that first backup on every rerun. It installs or updates only the new personal launcher and opens it for preview; the default HOME stays unchanged. It also checks the companion recommendation bridge and saves its report in `private/recommendation-status.txt`. A companion probe failure is reported and the personal launcher is reopened. Both apps must be built with the same signing key for the protected bridge to work.
+The combined photos installer configures the companion screensaver and calls the Home preview installer when home-personnel-preview.apk is present. The Home installer saves the original HOME component in `private/home-before.json` before installation and preserves that first backup on every rerun. It installs or updates only the new personal launcher and opens it for preview; the default HOME stays unchanged. It also checks the companion recommendation bridge and saves its report in `private/recommendation-status.txt`. A companion probe failure is reported and the personal launcher is reopened. Both apps must be built with the same signing key for the protected bridge to work.
 
-Optional weather location access can be granted with `-GrantLocation` on the Home installer. Without it, no location permission is granted by that script. `-Apk '<path>'` selects another personal Home APK. A signature mismatch must be resolved with an APK signed by the same key; keep the installed app and its data.
+Optional local Wi-Fi SSID access can be granted with `-GrantLocation` on the Home installer. The combined installer passes that option for the requested Wi-Fi name. Android may still redact the name when its location services are off; no global location setting is changed. `-Apk '<path>'` selects another personal Home APK. A signature mismatch must be resolved with an APK signed by the same key; keep the installed app and its data.
 
 Physically test navigation, app launching, recommendations and the real remote in the preview. Once it behaves correctly, activate it separately:
 
@@ -42,4 +41,4 @@ To update pictures later, edit the local `photos/` folder and run:
 powershell -ExecutionPolicy Bypass -File .\sync-photos.ps1 -TvHost '<tvip>' -Replace
 ```
 
-See [the companion notes](personal/ambient/README-preview.md) for photo formats and remote controls. These Home scripts have not been run against a real TV during this preparation. Physical remote testing is still required before activation. ADB is left available during those tests; close debugging when testing is complete.
+See [the companion notes](../ambient/README-preview.md) for photo formats and remote controls. These Home scripts have not been run against a real TV during this preparation. Physical remote testing is still required before activation. ADB is left available during those tests; close debugging when testing is complete.
