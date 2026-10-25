@@ -36,7 +36,7 @@ jobs:
           path=pathlib.Path('photos-football-preview.zip')
           path.write_bytes(raw)
           with zipfile.ZipFile(path) as z:
-              for name in ['photos-football-preview.apk','SHA256SUMS.txt']:
+              for name in ['photos-football-preview.apk','home-personnel-preview.apk','SHA256SUMS.txt']:
                   pathlib.Path(name).write_bytes(z.read(name))
           print('Tested public bundle verified; no signing key included.')
           PY
@@ -47,5 +47,5 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           [[ "$RELEASE_TAG" =~ ^photos-football-v[0-9.]+-preview$ ]]
-          gh release upload "$RELEASE_TAG" photos-football-preview.zip photos-football-preview.apk SHA256SUMS.txt --clobber
+          gh release upload "$RELEASE_TAG" photos-football-preview.zip photos-football-preview.apk home-personnel-preview.apk SHA256SUMS.txt --clobber
           gh release edit "$RELEASE_TAG" --draft=false --prerelease

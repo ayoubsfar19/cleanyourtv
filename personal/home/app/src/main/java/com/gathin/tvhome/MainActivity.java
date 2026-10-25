@@ -3156,6 +3156,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** The header opens launcher settings directly; hold OK keeps the extra home actions available. */
     private void showSettingsMenu() {
+        showSettingsMenu(false);
+    }
+
+    private void showSettingsMenu(boolean focusSuggestions) {
         View anchor = findViewById(R.id.btnSettings);
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
         LinearLayout rows = panel.findViewById(R.id.rows);
@@ -3172,6 +3176,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             });
         }
         if (moduleCards) addSettingsMenuRow(rows, popup, R.string.module_cards, this::showModuleCards);
+        addSettingsMenuRow(rows, popup, R.string.show_suggestions, () -> {
+            SuggestionsSettings.setEnabled(this, !SuggestionsSettings.enabled(this));
+            root.post(() -> showSettingsMenu(true));
+        });
+        View suggestionsRow = rows.getChildAt(rows.getChildCount() - 1);
+        ((TextView) suggestionsRow.findViewById(R.id.title)).setText(getString(
+                R.string.show_suggestions_state,
+                getString(SuggestionsSettings.enabled(this) ? R.string.on : R.string.off)));
         if (dockRow) addSettingsMenuRow(rows, popup, R.string.dock_edit, this::startDockEdit);
         addSettingsMenuRow(rows, popup, R.string.reorder, this::toggleReorder);
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
@@ -3179,7 +3191,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Hebrew puts Settings at the left of the header: grow the menu inward from it.
         dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar)
                 ? Gravity.START : Gravity.END);
-        rows.getChildAt(0).requestFocus();
+        (focusSuggestions ? suggestionsRow : rows.getChildAt(0)).requestFocus();
     }
 
     /**

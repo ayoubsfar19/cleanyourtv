@@ -85,6 +85,8 @@
     <string name="card_show">Show card</string>
     <string name="card_not_saved">Couldn\'t save the choice</string>
     <string name="module_cards">Module cards</string>
+    <string name="show_suggestions">Show suggestions</string>
+    <string name="show_suggestions_state">Show suggestions: %1$s</string>
     <string name="no_module_cards">No module cards installed</string>
     <string name="card_app_name">App: %1$s</string>
     <string name="card_state_shown">Shown</string>

@@ -41,6 +41,8 @@
     <string name="card_show">Afficher la carte</string>
     <string name="card_not_saved">Impossible d\'enregistrer le choix</string>
     <string name="module_cards">Cartes des modules</string>
+    <string name="show_suggestions">Afficher les suggestions</string>
+    <string name="show_suggestions_state">Afficher les suggestions : %1$s</string>
     <string name="no_module_cards">Aucune carte de module installée</string>
     <string name="card_app_name">Appli : %1$s</string>
     <string name="card_state_shown">Affichée</string>

@@ -42,3 +42,17 @@ powershell -ExecutionPolicy Bypass -File .\sync-photos.ps1 -TvHost '<tvip>' -Rep
 ```
 
 See [the companion notes](../ambient/README-preview.md) for photo formats and remote controls. These Home scripts have not been run against a real TV during this preparation. Physical remote testing is still required before activation. ADB is left available during those tests; close debugging when testing is complete.
+
+## Recommendation appearance and visibility
+
+Version 3.1 shows only recommendations with successfully loaded artwork. Cards use rounded 16:9 pictures and the launcher focus effect; the selected title appears beside the section heading while the card is focused. Apps without readable artwork keep their app icon and show no recommendation shelf.
+
+Hold OK on the header Settings button and use **Afficher les suggestions** beside **Module cards** to hide or show the shelf. This preference preserves the dock and other settings.
+
+For ADB, use the shell-protected receiver (replace `<tvip>`):
+
+```powershell
+.\adb.exe -s '<tvip>:5555' shell am broadcast -n com.gathin.personalhome/com.gathin.tvhome.SuggestionsReceiver --ez enabled false
+```
+
+Use `true` instead of `false` to show suggestions again. The preference takes effect immediately while Home is open, and persists across restarts.

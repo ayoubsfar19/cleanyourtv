@@ -1,6 +1,0 @@
-private/
-.gradle/
-build/
-app/build/
-local.properties
-*.apk
