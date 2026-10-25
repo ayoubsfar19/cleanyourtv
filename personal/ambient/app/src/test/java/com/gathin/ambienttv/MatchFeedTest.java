@@ -9,7 +9,7 @@ public class MatchFeedTest {
         MatchFeed.Match m=new MatchFeed.Match();m.id="test";m.home="Barcelona";m.away="Valencia";m.hs=home;m.as=away;m.state=state;m.status="STATUS_SCHEDULED";m.clock="52′";m.start="2026-10-25T13:00Z";return m;
     }
     private final long now=Instant.parse("2026-10-25T14:00:00Z").toEpochMilli();
-    @Test public void espnDatesWithoutSecondsWork(){assertEquals(OffsetDateTime.parse("2026-10-25T13:00Z").atZoneSameInstant(MatchFeed.ZONE).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),m("pre",0,0).label());}
+    @Test public void espnDatesWithoutSecondsWork(){assertEquals(OffsetDateTime.parse("2026-10-25T13:00Z").atZoneSameInstant(MatchFeed.zone()).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),m("pre",0,0).label());}
     @Test public void initialLiveScoreIsNotGoal(){assertNull(new MatchFeed.GoalGate().observe(m("in",2,0),now));}
     @Test public void goalsForEitherTeamAppearOnce(){MatchFeed.GoalGate g=new MatchFeed.GoalGate();g.observe(m("in",0,0),now);assertNotNull(g.observe(m("in",1,0),now));assertNull(g.observe(m("in",1,0),now));assertTrue(g.observe(m("in",1,1),now).startsWith("BUT !  ·  Valencia"));}
     @Test public void varCorrectionDoesNotDuplicate(){MatchFeed.GoalGate g=new MatchFeed.GoalGate();g.observe(m("in",0,0),now);assertNotNull(g.observe(m("in",1,0),now));assertNull(g.observe(m("in",0,0),now));assertNull(g.observe(m("in",1,0),now));assertNotNull(g.observe(m("in",2,0),now));}
@@ -21,4 +21,32 @@ public class MatchFeedTest {
         List<MatchFeed.Match> matches=MatchFeed.parse(raw);assertEquals(1,matches.size());assertEquals("Home",matches.get(0).home);assertEquals("1  –  2",matches.get(0).score());
     }
     @Test public void malformedEventDoesNotHideRest() throws Exception {assertTrue(MatchFeed.parse("{\"events\":[{}]}").isEmpty());}
+    @Test public void kickoffFollowsDeviceZoneWithoutAddingAnHour(){
+        TimeZone old=TimeZone.getDefault();
+        try{
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            assertEquals("13:00",m("pre",0,0).label());
+            TimeZone.setDefault(TimeZone.getTimeZone("GMT+01:00"));
+            assertEquals("14:00",m("pre",0,0).label());
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            assertEquals("13:00",m("pre",0,0).label());
+        }finally{TimeZone.setDefault(old);}
+    }
+    @Test public void timestampsWithOffsetsAreConvertedOnlyOnce(){
+        TimeZone old=TimeZone.getDefault();
+        try{
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            MatchFeed.Match match=m("pre",0,0);match.start="2026-10-25T14:00+01:00";
+            assertEquals("13:00",match.label());
+        }finally{TimeZone.setDefault(old);}
+    }
+    @Test public void deviceZoneRespectsSeasonalClockChanges(){
+        TimeZone old=TimeZone.getDefault();
+        try{
+            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Paris"));
+            MatchFeed.Match match=m("pre",0,0);match.start="2026-07-01T13:00Z";
+            assertEquals("15:00",match.label());
+            match.start="2026-12-01T13:00Z";assertEquals("14:00",match.label());
+        }finally{TimeZone.setDefault(old);}
+    }
 }

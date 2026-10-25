@@ -2,7 +2,7 @@
 
 Independent Android TV app, package `com.gathin.ambienttv`, based on cleanyourtv's photo-screensaver. It does not replace or change the launcher. Personal images remain on the computer and TV.
 
-The photo slideshow keeps a compact clock/date and weather. The bottom **Football** button opens a separate turquoise/purple sports page. La Liga fixtures, results and live scores come from ESPN. Score polling runs every 30 seconds only while the slideshow/screensaver is visible; goal banners last 10 seconds. The source can lag the live broadcast. New sessions establish a baseline and do not replay old goals. This preview has no cross-app overlay or background service.
+The photo slideshow keeps a compact clock/date and weather. Clock, date and kickoff times follow the TV’s current timezone, including seasonal changes; no country timezone or extra hour is imposed. The bottom **Football** button opens a separate turquoise/purple sports page. La Liga fixtures, results and live scores come from ESPN. Score polling runs every 30 seconds only while the slideshow/screensaver is visible; goal banners last 10 seconds. The source can lag the live broadcast. New sessions establish a baseline and do not replay old goals. This preview has no cross-app overlay or background service.
 
 ## Install on Windows
 

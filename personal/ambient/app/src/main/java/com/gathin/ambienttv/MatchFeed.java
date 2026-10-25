@@ -9,7 +9,8 @@ import java.util.*;
 
 /** Public ESPN scoreboard, read-only; no keys, accounts or personal photos sent. */
 final class MatchFeed {
-    static final ZoneId ZONE=ZoneId.of("Africa/Casablanca");
+    /** Read the current device zone each time; never add a fixed hour or pin a country zone. */
+    static ZoneId zone(){ return java.util.TimeZone.getDefault().toZoneId(); }
     static final class Match {
         String id, home, away, homeLogo, awayLogo, state, clock, start, status;
         int hs, as;
@@ -21,7 +22,7 @@ final class MatchFeed {
             if(finished())return "TERMINÉ";
             if(status.contains("POSTPON"))return "REPORTÉ";
             if(status.contains("CANCEL"))return "ANNULÉ";
-            try{return OffsetDateTime.parse(start).toInstant().atZone(ZONE).format(DateTimeFormatter.ofPattern("HH:mm"));}
+            try{return OffsetDateTime.parse(start).toInstant().atZone(zone()).format(DateTimeFormatter.ofPattern("HH:mm"));}
             catch(Exception e){return "À venir";}
         }
     }

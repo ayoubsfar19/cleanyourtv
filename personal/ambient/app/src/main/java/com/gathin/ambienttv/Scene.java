@@ -120,11 +120,11 @@ final class Scene {
     private void updateDate() {
         android.widget.TextClock date = root.findViewById(R.id.date);
         java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("EEEE d MMMM", java.util.Locale.FRANCE);
-        f.setTimeZone(java.util.TimeZone.getTimeZone("Africa/Casablanca"));
+        f.setTimeZone(java.util.TimeZone.getDefault());
         String value="'"+f.format(new java.util.Date())+"'";
         date.setFormat12Hour(value);date.setFormat24Hour(value);
         for(int id : new int[]{R.id.time,R.id.date,R.id.ampm}) {
-            ((android.widget.TextClock)root.findViewById(id)).setTimeZone("Africa/Casablanca");
+            ((android.widget.TextClock)root.findViewById(id)).setTimeZone(null);
         }
     }
 

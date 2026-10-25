@@ -32,7 +32,7 @@ final class SportsHub {
     private volatile boolean active;
     private volatile int generation,artGeneration;
     private int filter;
-    private LocalDate date=LocalDate.now(MatchFeed.ZONE);
+    private LocalDate date=LocalDate.now(MatchFeed.zone());
     private List<MatchFeed.Match> matches=new ArrayList<>();
     private MatchFeed.GoalGate goals=new MatchFeed.GoalGate();
     private final ArrayDeque<String> pending=new ArrayDeque<>();
@@ -73,7 +73,7 @@ final class SportsHub {
         String[] names={"Tous les matchs","● En direct","Résultats"};
         for(int i=0;i<names.length;i++){final int f=i;TextView b=button(names[i],()->{filter=f;render();});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,dp(36));p.rightMargin=dp(10);tabs.addView(b,p);}
         LinearLayout dates=new LinearLayout(c);dates.setGravity(Gravity.CENTER_VERTICAL);layout.addView(dates,new LinearLayout.LayoutParams(-1,dp(44)));
-        dates.addView(button("‹ Jour précédent",()->changeDay(-1)));dateLabel=text("",16);dateLabel.setGravity(Gravity.CENTER);dates.addView(dateLabel,new LinearLayout.LayoutParams(0,-2,1));dates.addView(button("Aujourd’hui",()->{date=LocalDate.now(MatchFeed.ZONE);loadDay();}));dates.addView(button("Jour suivant ›",()->changeDay(1)));
+        dates.addView(button("‹ Jour précédent",()->changeDay(-1)));dateLabel=text("",16);dateLabel.setGravity(Gravity.CENTER);dates.addView(dateLabel,new LinearLayout.LayoutParams(0,-2,1));dates.addView(button("Aujourd’hui",()->{date=LocalDate.now(MatchFeed.zone());loadDay();}));dates.addView(button("Jour suivant ›",()->changeDay(1)));
         LinearLayout body=new LinearLayout(c);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,0,1);bp.topMargin=dp(10);bp.bottomMargin=dp(10);layout.addView(body,bp);
         ScrollView scroll=new ScrollView(c);scroll.setFillViewport(true);scroll.setClipToPadding(false);rows=column();scroll.addView(rows,new ScrollView.LayoutParams(-1,-2));body.addView(scroll,new LinearLayout.LayoutParams(0,-1,2.25f));
         detail=column();detail.setGravity(Gravity.CENTER);detail.setPadding(dp(16),dp(16),dp(16),dp(16));detail.setBackground(bg(0x8810192B,0,16));LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(0,-1,1);dp.leftMargin=dp(16);body.addView(detail,dp);
@@ -86,20 +86,20 @@ final class SportsHub {
         try{matches=raw.isEmpty()?new ArrayList<>():MatchFeed.parse(raw);}catch(Exception e){matches=new ArrayList<>();}
         render();requestDate(date,false);
     }
-    private void refreshToday(){requestDate(LocalDate.now(MatchFeed.ZONE),true);}
+    private void refreshToday(){requestDate(LocalDate.now(MatchFeed.zone()),true);}
     private void requestDate(LocalDate requested,boolean notify){
         if(!active||net==null)return;
         if(requests.contains(requested))return;
         final int g=generation;requests.add(requested);
         net.execute(()->{
             try{
-                if(!requested.equals(date)&&!requested.equals(LocalDate.now(MatchFeed.ZONE))){ui.post(()->requests.remove(requested));return;}
+                if(!requested.equals(date)&&!requested.equals(LocalDate.now(MatchFeed.zone()))){ui.post(()->requests.remove(requested));return;}
                 String raw=MatchFeed.fetch(requested);List<MatchFeed.Match> fresh=MatchFeed.parse(raw);long at=System.currentTimeMillis();
                 if(!active||generation!=g)return;
                 cache.edit().putString("day-"+requested,raw).putLong("at-"+requested,at).apply();
                 ui.post(()->{if(!active||generation!=g)return;requests.remove(requested);
                     // Today is observed even when viewing another date; never alert from archived results.
-                    if(requested.equals(LocalDate.now(MatchFeed.ZONE)))for(MatchFeed.Match m:fresh){String alert=goals.observe(m,at);if(alert!=null)enqueue(alert);}
+                    if(requested.equals(LocalDate.now(MatchFeed.zone())))for(MatchFeed.Match m:fresh){String alert=goals.observe(m,at);if(alert!=null)enqueue(alert);}
                     if(date.equals(requested)){matches=fresh;checked=at;failure="";render();}
                 });
             }catch(Exception e){ui.post(()->{if(!active||generation!=g)return;requests.remove(requested);if(date.equals(requested)){failure="Connexion indisponible · données conservées";render();}});}
@@ -108,7 +108,7 @@ final class SportsHub {
     private void render(){
         if(page==null||rows==null)return;
         dateLabel.setText(date.format(DateTimeFormatter.ofPattern("EEEE d MMMM",Locale.FRANCE)));
-        source.setText("ESPN · "+(checked==0?"Chargement…":"Actualisé à "+Instant.ofEpochMilli(checked).atZone(MatchFeed.ZONE).format(DateTimeFormatter.ofPattern("HH:mm")))+" · suivi 30 s · heures du Maroc"+(failure.isEmpty()?"":"  /  "+failure));
+        source.setText("ESPN · "+(checked==0?"Chargement…":"Actualisé à "+Instant.ofEpochMilli(checked).atZone(MatchFeed.zone()).format(DateTimeFormatter.ofPattern("HH:mm")))+" · suivi 30 s · heure du téléviseur"+(failure.isEmpty()?"":"  /  "+failure));
         // Updating scores does not detach the focused card or reset the user's D-pad position.
         View focused=page.findFocus();String focusedId=focused==null?null:(focused.getTag() instanceof String?(String)focused.getTag():null);
         rows.removeAllViews();List<MatchFeed.Match> visible=new ArrayList<>();
