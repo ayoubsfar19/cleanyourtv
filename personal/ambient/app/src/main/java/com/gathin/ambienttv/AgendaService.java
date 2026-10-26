@@ -57,12 +57,22 @@ public final class AgendaService extends Service {
     private PowerManager power;
     private WindowManager windows;
     private LinearLayout overlay;
+    private AgendaChime chime;
     private volatile boolean ending;
     private volatile long skipThrough;
     private volatile long nextPoll;
     private long lastPrune, rebuiltDay = Long.MIN_VALUE;
     private boolean started, registered;
     private final Runnable dismissOverlay = this::removeOverlay;
+
+    private static final class Alert {
+        final AgendaEvent event;
+        final AgendaReminderPolicy.Reminder reminder;
+        Alert(AgendaEvent event, AgendaReminderPolicy.Reminder reminder) {
+            this.event = event;
+            this.reminder = reminder;
+        }
+    }
 
     /** Called from the visible settings screen; receiver restarts never enable an opted-out service. */
     static boolean start(Context context) {
@@ -92,6 +102,7 @@ public final class AgendaService extends Service {
         super.onCreate();
         power = (PowerManager) getSystemService(POWER_SERVICE);
         windows = (WindowManager) getSystemService(WINDOW_SERVICE);
+        chime = new AgendaChime(this);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -136,6 +147,7 @@ public final class AgendaService extends Service {
     private final BroadcastReceiver screenChanges = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             removeOverlay();
+            if (chime != null) chime.stop();
             if (Intent.ACTION_SCREEN_ON.equals(intent.getAction())) {
                 // Consume deadlines that passed while the TV was off, even between two 10-second ticks.
                 skipThrough = System.currentTimeMillis();
@@ -190,15 +202,16 @@ public final class AgendaService extends Service {
         if (revision.isEmpty()) return;
         SharedPreferences p = AgendaStore.preferences(this);
         SharedPreferences.Editor edits = p.edit();
-        List<AgendaEvent> due = new ArrayList<>();
+        List<Alert> due = new ArrayList<>();
         ZoneId zone = ZoneId.systemDefault();
         int fallback = AgendaStore.defaultMinutes(this);
+        boolean repeated = AgendaStore.repeated(this);
         boolean changed = false;
         for (AgendaEvent event : AgendaStore.load(this)) {
             if (event.endMillis < now - DAY) continue;
-            for (int minutes : AgendaReminderPolicy.minutes(event, fallback)) {
-                long when = AgendaReminderPolicy.reminderTime(event, minutes, zone);
-                String key = AgendaReminderPolicy.reminderKey(event, when);
+            for (AgendaReminderPolicy.Reminder reminder : AgendaReminderPolicy.reminders(event, fallback, zone, repeated)) {
+                long when = reminder.when;
+                String key = AgendaReminderPolicy.reminderKey(event, reminder);
                 String seenKey = "seen_" + key, doneKey = "done_" + key;
                 long firstSeen = p.getLong(seenKey, 0);
                 if (firstSeen == 0) {
@@ -213,7 +226,7 @@ public final class AgendaService extends Service {
                 // Persist before presentation so process death or an overlay failure cannot repeat it.
                 edits.putLong(doneKey, now);
                 changed = true;
-                if (decision == AgendaReminderPolicy.Decision.SHOW && !due.contains(event)) due.add(event);
+                if (decision == AgendaReminderPolicy.Decision.SHOW) due.add(new Alert(event, reminder));
             }
         }
         if (now - lastPrune > DAY) {
@@ -259,7 +272,7 @@ public final class AgendaService extends Service {
         else startForeground(FOREGROUND_ID, notification);
     }
 
-    private void showReminders(List<AgendaEvent> due) {
+    private void showReminders(List<Alert> due) {
         if (ending || !AgendaStore.enabled(this) || !interactive()) return;
         removeOverlay();
         if (windows != null && Settings.canDrawOverlays(this)) {
@@ -273,7 +286,8 @@ public final class AgendaService extends Service {
                 glass.setStroke(dp(1), 0x45FFFFFF);
                 card.setBackground(glass);
                 for (int i = 0; i < Math.min(3, due.size()); i++) {
-                    AgendaEvent event = due.get(i);
+                    Alert alert = due.get(i);
+                    AgendaEvent event = alert.event;
                     TextView title = new TextView(this);
                     title.setText(cleanTitle(event.title));
                     title.setTextColor(urgent(event) ? 0xFFFF9A78 : Color.WHITE);
@@ -283,7 +297,7 @@ public final class AgendaService extends Service {
                     if (i > 0) title.setPadding(0, dp(14), 0, 0);
                     card.addView(title);
                     TextView time = new TextView(this);
-                    time.setText(timeLabel(event));
+                    time.setText(stageLabel(alert.reminder.stage) + " · " + timeLabel(event));
                     time.setTextColor(0xFFD4E0E3);
                     time.setTextSize(14);
                     card.addView(time);
@@ -307,25 +321,42 @@ public final class AgendaService extends Service {
                 windows.addView(card, position);
                 overlay = card;
                 main.postDelayed(dismissOverlay, 10_000);
+                playChime();
                 return;
             } catch (RuntimeException ignored) { removeOverlay(); }
         }
-        fallbackNotification(due);
+        if (fallbackNotification(due)) playChime();
     }
 
-    private void fallbackNotification(List<AgendaEvent> due) {
+    private boolean fallbackNotification(List<Alert> due) {
         if (!interactive() || (Build.VERSION.SDK_INT >= 33
-                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)) return;
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)) return false;
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (manager == null) return;
-        AgendaEvent first = due.get(0);
+        if (manager == null || !manager.areNotificationsEnabled()) return false;
+        NotificationChannel channel = manager.getNotificationChannel(REMINDERS);
+        if (channel == null || channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return false;
+        Alert firstAlert = due.get(0);
+        AgendaEvent first = firstAlert.event;
         String title = cleanTitle(first.title) + (due.size() > 1 ? " (+" + (due.size() - 1) + ")" : "");
         try {
             manager.notify(REMINDER_ID, new Notification.Builder(this, REMINDERS)
                     .setSmallIcon(android.R.drawable.ic_menu_my_calendar).setContentTitle(title)
-                    .setContentText(timeLabel(first)).setOnlyAlertOnce(true).setTimeoutAfter(10_000)
+                    .setContentText(stageLabel(firstAlert.reminder.stage) + " · " + timeLabel(first))
+                    .setOnlyAlertOnce(true).setTimeoutAfter(10_000)
                     .setVisibility(Notification.VISIBILITY_PRIVATE).build());
-        } catch (RuntimeException ignored) { /* Notification permission is optional. */ }
+            return true;
+        } catch (RuntimeException ignored) { return false; }
+    }
+
+    private void playChime() {
+        if (chime != null && AgendaStore.sound(this) && interactive()) chime.play();
+    }
+
+    private static String stageLabel(String stage) {
+        if ("start".equals(stage)) return "Début du rendez-vous";
+        if ("middle".equals(stage)) return "Rendez-vous en cours";
+        if ("end".equals(stage)) return "Fin du rendez-vous";
+        return "Rappel";
     }
 
     private static boolean urgent(AgendaEvent event) {
@@ -359,6 +390,7 @@ public final class AgendaService extends Service {
             registered = false;
         }
         removeOverlay();
+        if (chime != null) chime.stop();
         main.removeCallbacksAndMessages(null);
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (manager != null) manager.cancel(REMINDER_ID);

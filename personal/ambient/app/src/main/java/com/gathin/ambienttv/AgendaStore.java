@@ -43,6 +43,14 @@ final class AgendaStore {
         return preferences(context).getString("source_revision", "");
     }
     static boolean enabled(Context context) { return preferences(context).getBoolean(ENABLED, false); }
+    static boolean repeated(Context context) { return preferences(context).getBoolean("three_reminders", true); }
+    static void setRepeated(Context context, boolean enabled) {
+        preferences(context).edit().putBoolean("three_reminders", enabled).apply();
+    }
+    static boolean sound(Context context) { return preferences(context).getBoolean("reminder_sound", true); }
+    static void setSound(Context context, boolean enabled) {
+        preferences(context).edit().putBoolean("reminder_sound", enabled).apply();
+    }
     static void setEnabled(Context context, boolean enabled) {
         preferences(context).edit().putBoolean(ENABLED, enabled && configured(context)).commit();
     }
@@ -69,9 +77,11 @@ final class AgendaStore {
         boolean changed = !validated.equals(url(context));
         if (changed) {
             boolean wasEnabled = enabled(context);
+            boolean repeated = repeated(context), sound = sound(context);
             deleteFiles(context);
             p.edit().clear().putString(URL, validated).putInt(DEFAULT, minutes)
                     .putString("source_revision", java.util.UUID.randomUUID().toString())
+                    .putBoolean("three_reminders", repeated).putBoolean("reminder_sound", sound)
                     .putBoolean(ENABLED, wasEnabled).commit();
         } else p.edit().putInt(DEFAULT, minutes).commit();
     }

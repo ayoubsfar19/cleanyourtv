@@ -15,6 +15,16 @@ final class AgendaReminderPolicy {
     static final long GRACE_MILLIS = 60_000L;
     enum Decision { WAIT, SHOW, SKIP }
 
+    static final class Reminder {
+        final long when;
+        final String stage;
+
+        Reminder(long when, String stage) {
+            this.when = when;
+            this.stage = stage;
+        }
+    }
+
     private AgendaReminderPolicy() { }
 
     static boolean validDefault(int minutes) {
@@ -43,12 +53,39 @@ final class AgendaReminderPolicy {
         return eventTime(event, zone) - minutes * 60_000L;
     }
 
+    /** Timed events can repeat through their duration; DATE events keep their calendar alarms. */
+    static List<Reminder> reminders(AgendaEvent event, int fallback, ZoneId zone, boolean repeated) {
+        List<Reminder> result = new ArrayList<>();
+        if (repeated && !event.allDay) {
+            result.add(new Reminder(event.startMillis, "start"));
+            if (event.endMillis > event.startMillis) {
+                // Average without overflowing, including occurrences crossing the epoch.
+                long middle = (event.startMillis & event.endMillis)
+                        + ((event.startMillis ^ event.endMillis) >> 1);
+                if (middle > event.startMillis) result.add(new Reminder(middle, "middle"));
+                result.add(new Reminder(event.endMillis, "end"));
+            }
+        } else {
+            for (int minutes : minutes(event, fallback)) {
+                result.add(new Reminder(reminderTime(event, minutes, zone), "before"));
+            }
+            result.sort((a, b) -> Long.compare(a.when, b.when));
+        }
+        return result;
+    }
+
     static String occurrenceKey(AgendaEvent event) {
         return digest(event.id + "\n" + event.startMillis);
     }
 
     static String reminderKey(AgendaEvent event, long reminderTime) {
         return digest(event.id + "\n" + event.startMillis + "\n" + reminderTime);
+    }
+
+    static String reminderKey(AgendaEvent event, Reminder reminder) {
+        if ("before".equals(reminder.stage)) return reminderKey(event, reminder.when);
+        return digest(event.id + "\n" + event.startMillis + "\n" + reminder.stage
+                + "\n" + reminder.when);
     }
 
     /** New entries are armed only for future deadlines; screen-off deadlines are consumed silently. */

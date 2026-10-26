@@ -1,9 +1,11 @@
-# Google Agenda sur la TV — preview 3.6
+# Google Agenda sur la TV — preview 3.7
 
-L'agenda affiche les prochains evenements dans Photos & Football et un rappel
-pendant environ **10 secondes au-dessus des autres applications**, lorsque la TV
-autorise les superpositions. Il lit un seul agenda Google via son adresse secrete
-iCal. Les photos, Home et le mode Nuit restent disponibles comme auparavant.
+L'agenda affiche les prochains evenements dans Photos & Football et, par defaut,
+**trois rappels : debut, milieu et fin** de chaque evenement avec une heure.
+Chaque rappel reste environ **10 secondes au-dessus des autres applications**,
+lorsque la TV autorise les superpositions, avec un bref son discret. Il lit un
+seul agenda Google via son adresse secrete iCal. Les photos, Home et le mode Nuit
+restent disponibles comme auparavant.
 
 Le telephone et la TV peuvent etre sur des reseaux differents : cela fonctionne
 aussi hors de la maison si l'iPhone et la TV ont chacun Internet. La TV interroge
@@ -15,7 +17,7 @@ maximum n'est garanti. La TV doit etre allumee; le service ne la reveille pas.
 
 Il faut Windows 10, **Windows PowerShell 5.1**, `adb.exe` et une TV Android TV ou
 Google TV. Placez [configure-agenda.ps1](configure-agenda.ps1) et le nouvel APK
-`photos-football-preview.apk` de version **3.6 ou plus recente** dans le dossier
+`photos-football-preview.apk` de version **3.7 ou plus recente** dans le dossier
 `platform-tools`, pres de `adb.exe`. Le script trouve aussi `adb.exe` dans le
 dossier courant ou dans le PATH. Cette mise a jour de l'application n'est
 necessaire qu'une fois; configurer l'agenda ne reinstalle ensuite rien.
@@ -89,9 +91,28 @@ heure. Une note destinee a la TV doit etre dans la **description de cet evenemen
 Les rappels de l'iPhone restent regles separement dans Google Agenda et les
 autorisations de notifications d'iOS; les reglages TV ne les changent pas.
 
-Pour la TV, un rappel `DISPLAY` present dans le flux iCal est utilise. Si le flux
-n'en contient pas, le rappel TV arrive par defaut **10 minutes avant** l'evenement.
-Les notifications ajoutees dans l'application Google Agenda ne sont pas toujours
+Sur la TV, **Trois rappels : debut, milieu et fin** est active par defaut. Pour un
+evenement de **16:40 a 16:50**, les trois horaires sont **16:40, 16:45 et 16:50**,
+avec une alerte de 10 secondes a chaque fois. Ces horaires remplacent les rappels
+du flux pour les evenements avec une heure. Si plusieurs instants coincident,
+notamment pour une duree nulle ou tres courte, ils sont regroupes en une seule
+alerte.
+
+**Son discret des rappels** est aussi active par defaut : un son faible d'environ
+150 ms accompagne l'alerte. Il respecte le volume des notifications, le mode
+silencieux et **Ne pas deranger**, sans changer le volume de la video ni demander
+le focus audio.
+
+Ces deux interrupteurs sont en haut des reglages **Agenda Google** sur la TV.
+Leur choix est enregistre immediatement et s'applique au prochain controle du
+service actif. Ils ne demarrent pas le service si l'agenda est desactive. Une mise
+a jour conserve un choix desactive deja enregistre.
+
+Desactivez **Trois rappels : debut, milieu et fin** pour le **mode classique** :
+les rappels `DISPLAY` presents dans le flux iCal sont utilises. Si le flux n'en
+contient pas, un rappel unique arrive par defaut **10 minutes avant** l'evenement.
+Le reglage TV **Mode classique : delai de secours** choisit ce delai. Les
+notifications ajoutees dans l'application Google Agenda ne sont pas toujours
 exportees dans ce flux. Pour choisir le delai de secours lors de la configuration :
 
 ```powershell
@@ -102,9 +123,11 @@ Les valeurs possibles sont `0`, `5`, `10`, `15`, `30` et `60` minutes; `0` signi
 a l'heure de l'evenement. Reconfigurer demande de nouveau l'adresse masquee et
 ouvre les reglages sur la TV.
 
-Un evenement sur toute la journee utilise **09:00, heure du televiseur**, comme
-heure de reference du rappel TV. Les rappels deja passes a la premiere lecture,
-pendant l'arret de la TV ou avant la reprise du service ne sont pas rejoues.
+Un evenement sur toute la journee conserve le mode classique, avec **09:00, heure
+du televiseur**, comme reference pour ses rappels du flux ou le delai de secours.
+Il ne declenche pas les trois rappels a minuit. Les rappels deja passes a la
+premiere lecture, pendant l'arret de la TV ou avant la reprise du service ne sont
+pas rejoues.
 
 Ce flux est **en lecture seule** : la TV ne cree, ne modifie et ne supprime aucun
 evenement Google. Les **Taches Google**, Google Keep, les Rappels Apple et les notes

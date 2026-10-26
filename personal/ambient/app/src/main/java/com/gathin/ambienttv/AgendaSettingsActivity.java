@@ -38,10 +38,10 @@ public final class AgendaSettingsActivity extends Activity {
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private SharedPreferences preferences;
-    private Switch enabled;
+    private Switch enabled, repeated, sound;
     private EditText address;
     private Spinner reminder;
-    private TextView status, feedback, overlayStatus;
+    private TextView status, feedback, overlayStatus, timing;
     private Button sync, disable, disconnect, allowOverlay;
     private boolean updating, destroyed;
 
@@ -66,15 +66,15 @@ public final class AgendaSettingsActivity extends Activity {
         TextView title = text("Agenda Google", 28, TEXT);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         page.addView(title);
-        TextView intro = text("Vos deux prochains rendez-vous sur les photos, avec un rappel discret de 10 secondes sur la TV.", 16, MUTED);
-        intro.setPadding(0, dp(8), 0, dp(16));
+        TextView intro = text("Deux prochains rendez-vous sur les photos. Des rappels discrets de 10 secondes sur la TV.", 15, MUTED);
+        intro.setPadding(0, dp(8), 0, dp(10));
         page.addView(intro);
 
         enabled = new Switch(this);
         enabled.setText("Activer l’agenda et les rappels TV");
         enabled.setTextColor(TEXT);
-        enabled.setTextSize(18);
-        enabled.setPadding(dp(8), dp(10), dp(8), dp(10));
+        enabled.setTextSize(16);
+        enabled.setPadding(dp(8), dp(6), dp(8), dp(6));
         enabled.setOnCheckedChangeListener((view, on) -> {
             if (updating) return;
             if (on && !AgendaStore.configured(this)) {
@@ -89,6 +89,30 @@ public final class AgendaSettingsActivity extends Activity {
             updateState();
         });
         page.addView(enabled, fullWidth());
+
+        repeated = preferenceSwitch("Trois rappels : début, milieu et fin");
+        repeated.setOnCheckedChangeListener((view, on) -> {
+            if (updating) return;
+            AgendaStore.setRepeated(this, on);
+            showFeedback(on ? "Trois rappels activés pour les événements avec une heure."
+                    : "Mode classique activé : rappels du flux ou délai de secours.");
+            updateState();
+        });
+        page.addView(repeated, fullWidth());
+        TextView stages = text("Événement avec une heure : début, milieu et fin, 10 s chacun. Les instants identiques sont regroupés.", 13, MUTED);
+        stages.setPadding(dp(8), 0, dp(8), dp(4));
+        page.addView(stages);
+
+        sound = preferenceSwitch("Son discret des rappels");
+        sound.setOnCheckedChangeListener((view, on) -> {
+            if (updating) return;
+            AgendaStore.setSound(this, on);
+            showFeedback(on ? "Son discret activé." : "Rappels silencieux.");
+        });
+        page.addView(sound, fullWidth());
+        TextView soundHelp = text("Son bref et faible, selon le volume des notifications et le mode silencieux / Ne pas déranger. Le volume vidéo reste inchangé.", 13, MUTED);
+        soundHelp.setPadding(dp(8), 0, dp(8), dp(4));
+        page.addView(soundHelp);
 
         page.addView(label("Adresse secrète Google Agenda"));
         address = new EditText(this);
@@ -116,9 +140,9 @@ public final class AgendaSettingsActivity extends Activity {
         help.setPadding(dp(4), dp(8), dp(4), dp(6));
         page.addView(help);
 
-        page.addView(label("Rappel TV par défaut"));
+        page.addView(label("Mode classique : délai de secours"));
         reminder = new Spinner(this);
-        reminder.setContentDescription("Rappel TV par défaut");
+        reminder.setContentDescription("Mode classique : délai de secours du rappel TV");
         ArrayAdapter<String> choices = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item,
                 new String[]{"À l’heure de l’événement", "5 minutes avant", "10 minutes avant",
@@ -130,7 +154,7 @@ public final class AgendaSettingsActivity extends Activity {
             if (REMINDER_MINUTES[i] == storedMinutes) reminder.setSelection(i);
         }
         page.addView(reminder, new LinearLayout.LayoutParams(dp(310), dp(48)));
-        TextView timing = text("Ce délai s’applique si le flux ne contient aucun rappel. Les notifications Google Agenda de l’iPhone se règlent séparément. La TV vérifie environ chaque minute ; Google peut ajouter un délai.", 14, MUTED);
+        timing = text("", 13, MUTED);
         timing.setPadding(dp(4), dp(5), dp(4), dp(12));
         page.addView(timing);
 
@@ -221,7 +245,12 @@ public final class AgendaSettingsActivity extends Activity {
         boolean active = configured && AgendaStore.enabled(this);
         updating = true;
         enabled.setChecked(active);
+        repeated.setChecked(AgendaStore.repeated(this));
+        sound.setChecked(AgendaStore.sound(this));
         updating = false;
+        timing.setText(repeated.isChecked()
+                ? "Journées entières : rappels du flux ou ce délai, avec 09:00 comme référence. Désactivez les trois rappels pour appliquer ce mode classique aux événements avec une heure."
+                : "Mode classique : rappels du flux Google ou, à défaut, un rappel unique avec ce délai. Journées entières : référence à 09:00. Les notifications de l’iPhone se règlent séparément.");
         address.setHint(configured ? "Adresse secrète enregistrée · saisir pour remplacer" : "https://calendar.google.com/calendar/ical/…/basic.ics");
         sync.setEnabled(active);
         disable.setEnabled(active);
@@ -264,6 +293,16 @@ public final class AgendaSettingsActivity extends Activity {
         view.setText(value);
         view.setTextColor(color);
         view.setTextSize(size);
+        return view;
+    }
+
+    private Switch preferenceSwitch(String value) {
+        Switch view = new Switch(this);
+        view.setText(value);
+        view.setTextColor(TEXT);
+        view.setTextSize(16);
+        view.setPadding(dp(8), dp(6), dp(8), dp(6));
+        view.setMinimumHeight(dp(44));
         return view;
     }
 
