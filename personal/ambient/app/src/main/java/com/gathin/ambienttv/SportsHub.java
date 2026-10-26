@@ -48,6 +48,9 @@ final class SportsHub {
     private int verticalKey;
     private long checked;
     private String failure="",selectedId="";
+    private Runnable pageChanged;
+    void setPageChangedListener(Runnable listener) { pageChanged = listener; }
+    private void pageChanged() { if (pageChanged != null) pageChanged.run(); }
     private final Runnable poll=new Runnable(){public void run(){if(!active)return;refreshToday();ui.postDelayed(this,30_000);}};
     private final Runnable weatherPoll=new Runnable(){public void run(){if(!active)return;refreshWeather();ui.postDelayed(this,30*60_000L);}};
     private interface Loader { JSONObject load() throws Exception; }
@@ -105,7 +108,7 @@ final class SportsHub {
         }
         closePage();return true;
     }
-    private void closePage(){if(page==null)return;root.removeView(page);page=null;main=null;mainHeader=null;rows=null;detail=null;backdrop=null;inspectors.clear();inspectorFocus.clear();artGeneration++;launch.setVisibility(View.VISIBLE);launch.requestFocus();}
+    private void closePage(){if(page==null)return;root.removeView(page);page=null;main=null;mainHeader=null;rows=null;detail=null;backdrop=null;inspectors.clear();inspectorFocus.clear();artGeneration++;launch.setVisibility(View.VISIBLE);launch.requestFocus();pageChanged();}
     private int dp(float v){return Math.round(v*c.getResources().getDisplayMetrics().density);}
     private TextView text(String s,int size){TextView t=new TextView(c);t.setText(s);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setFontFeatureSettings("tnum");return t;}
     private GradientDrawable bg(int color,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=0)d.setStroke(dp(2),stroke);return d;}
@@ -115,6 +118,7 @@ final class SportsHub {
     private void open(){
         if(page!=null)return;
         page=new FrameLayout(c);page.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF008E99,0xFF143B55,0xFF572C79}));root.addView(page,new FrameLayout.LayoutParams(-1,-1));launch.setVisibility(View.GONE);
+        pageChanged();
         backdrop=new ImageView(c);backdrop.setScaleType(ImageView.ScaleType.FIT_CENTER);backdrop.setAlpha(0.16f);page.addView(backdrop,new FrameLayout.LayoutParams(dp(430),dp(430),Gravity.RIGHT|Gravity.CENTER_VERTICAL));
         main=column();main.setPadding(dp(30),dp(22),dp(30),dp(16));page.addView(main,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout heading=new LinearLayout(c);mainHeader=heading;heading.setGravity(Gravity.CENTER_VERTICAL);main.addView(heading,new LinearLayout.LayoutParams(-1,dp(44)));

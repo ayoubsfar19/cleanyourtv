@@ -29,6 +29,7 @@ public class FilesProvider extends ContentProvider {
 
     /** Explicit shell-only playlist management; ContentProvider.call needs its own permission check. */
     @Override public synchronized Bundle call(String method, String arg, Bundle extras) {
+        if ("agenda".equals(method)) return agendaCall(arg, extras);
         if (!"night_playlist".equals(method)) return super.call(method, arg, extras);
         if (getContext() == null) throw new IllegalStateException("Stockage indisponible");
         if (Binder.getCallingUid() != Process.myUid()) {
@@ -82,6 +83,60 @@ public class FilesProvider extends ContentProvider {
             try { result.put("success", false).put("message", failure.getMessage() == null ? "Commande impossible" : failure.getMessage()); }
             catch (org.json.JSONException ignored) { }
         }
+        reply.putString("result", result.toString());
+        return reply;
+    }
+
+    /** The private feed is passed locally by the owner's ADB tool, never echoed in a result. */
+    private Bundle agendaCall(String action, Bundle extras) {
+        android.content.Context context = getContext();
+        if (context == null) throw new IllegalStateException("Stockage indisponible");
+        if (Binder.getCallingUid() != Process.myUid()) {
+            context.enforceCallingPermission("android.permission.WRITE_SECURE_SETTINGS", "Commande ADB requise");
+        }
+        JSONObject result = new JSONObject();
+        try {
+            String message;
+            if ("configure".equals(action)) {
+                String encoded = extras == null ? "" : extras.getString("url64", "");
+                if (encoded.isEmpty() || encoded.length() > 8192) throw new IllegalArgumentException();
+                byte[] raw = Base64.decode(encoded, Base64.DEFAULT);
+                String url = java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                        .decode(java.nio.ByteBuffer.wrap(raw)).toString();
+                int minutes = extras == null ? 10 : extras.getInt("minutes", 10);
+                AgendaStore.configure(context, url, minutes);
+                if (AgendaStore.enabled(context)) AgendaService.syncNow(context);
+                message = "Agenda enregistré. Activez les rappels dans les réglages du téléviseur.";
+            } else if ("enable".equals(action)) {
+                if (!AgendaStore.configured(context)) throw new IllegalStateException();
+                message = AgendaService.start(context) ? "Agenda activé."
+                        : "Activez l’agenda depuis les réglages du téléviseur.";
+            } else if ("disable".equals(action)) {
+                AgendaService.stop(context);
+                message = "Agenda désactivé.";
+            } else if ("disconnect".equals(action)) {
+                AgendaService.stop(context);
+                AgendaStore.clear(context);
+                message = "Agenda déconnecté et données locales effacées.";
+            } else if ("sync".equals(action)) {
+                if (!AgendaStore.enabled(context)) throw new IllegalStateException();
+                AgendaService.syncNow(context);
+                message = "Synchronisation demandée.";
+            } else if ("status".equals(action)) {
+                message = AgendaStore.status(context);
+            } else throw new IllegalArgumentException();
+            result.put("success", true).put("message", message)
+                    .put("configured", AgendaStore.configured(context))
+                    .put("enabled", AgendaStore.enabled(context))
+                    .put("default_minutes", AgendaStore.defaultMinutes(context))
+                    .put("last_success", AgendaStore.lastSuccess(context));
+        } catch (Exception failure) {
+            try { result.put("success", false).put("message", "Commande impossible. Vérifiez la configuration de l’agenda dans les réglages du téléviseur."); }
+            catch (org.json.JSONException ignored) { }
+        }
+        Bundle reply = new Bundle();
         reply.putString("result", result.toString());
         return reply;
     }

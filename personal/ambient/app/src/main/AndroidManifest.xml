@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.location.network" android:required="false" />
 
@@ -33,6 +35,24 @@
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:supportsRtl="true">
+
+        <activity android:name=".AgendaSettingsActivity" android:exported="true"
+            android:permission="android.permission.WRITE_SECURE_SETTINGS"
+            android:label="Agenda et rappels"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+        <service android:name=".AgendaService" android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-enabled private calendar synchronization and appointment reminders while the TV is on" />
+        </service>
+        <receiver android:name=".AgendaReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <activity android:name=".NightAccessActivity" android:exported="false"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />

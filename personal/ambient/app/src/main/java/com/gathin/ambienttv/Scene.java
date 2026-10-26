@@ -40,6 +40,7 @@ final class Scene {
     private final SportsHub sports;
     private final WifiStatus wifi;
     private final NightMode night;
+    private final AgendaCard agenda;
     private boolean running;
     private int photoArrowKey;
 
@@ -127,11 +128,13 @@ final class Scene {
                 empty.setVisibility(View.GONE);
                 caption.setVisibility(View.GONE);
                 sports.setAmbientActionsVisible(false);
+                updateAgendaVisibility();
             }
             @Override public void onExit() {
                 stage.setVisibility(View.VISIBLE);
                 if (options.dates && !options.prints) caption.setVisibility(View.VISIBLE);
                 sports.setAmbientActionsVisible(true);
+                updateAgendaVisibility();
                 if (running) {
                     if (slides != null) slides.start();
                     if (prints != null) prints.start();
@@ -147,7 +150,13 @@ final class Scene {
                 android.widget.Toast.makeText(context, "Impossible d’ouvrir le mode nuit", android.widget.Toast.LENGTH_SHORT).show();
             }
         });
+        agenda = new AgendaCard(context, root);
+        sports.setPageChangedListener(this::updateAgendaVisibility);
         updateDate();
+    }
+
+    private void updateAgendaVisibility() {
+        if (agenda != null) agenda.setVisible(!sports.isOpen() && !night.isActive());
     }
 
     private void nightStatus(String message) { if (night != null) night.setStatus(message); }
@@ -157,6 +166,7 @@ final class Scene {
         running = true;
         sports.start();
         wifi.start();
+        agenda.start();
         if (slides != null) slides.start();
         if (prints != null) prints.start();
         night.start();
@@ -170,6 +180,7 @@ final class Scene {
         night.stop();
         sports.stop();
         wifi.stop();
+        agenda.stop();
         handler.removeCallbacksAndMessages(null);
         if (slides != null) slides.stop();
         if (prints != null) prints.stop();
