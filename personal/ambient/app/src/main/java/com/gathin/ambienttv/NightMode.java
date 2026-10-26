@@ -15,6 +15,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 /** The small night-mode controls; the host supplies playback and retains its ambient widgets. */
@@ -57,8 +58,8 @@ final class NightMode {
         this.videoLayer = videoLayer;
         this.playback = playback;
         this.listener = listener;
-        if (labels == null || labels.length != 4) {
-            throw new IllegalArgumentException("Night mode needs four playlist labels");
+        if (labels == null || labels.length < 1 || labels.length > 50) {
+            throw new IllegalArgumentException("Night mode needs between 1 and 50 playlist labels");
         }
         this.labels = labels.clone();
 
@@ -382,6 +383,12 @@ final class NightMode {
         hint.setTextColor(0xFFB9C8D5);
         hint.setPadding(0, dp(6), 0, dp(16));
         panel.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+        ScrollView scroll = new ScrollView(context);
+        scroll.setFocusable(false);
+        panel.addView(scroll, new LinearLayout.LayoutParams(-1, dp(Math.min(labels.length * 60, 300))));
+        LinearLayout list = new LinearLayout(context);
+        list.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
         choices = new TextView[labels.length];
         for (int i = 0; i < labels.length; i++) {
             final int index = i;
@@ -397,7 +404,7 @@ final class NightMode {
             });
             LinearLayout.LayoutParams position = new LinearLayout.LayoutParams(-1, dp(52));
             position.topMargin = dp(8);
-            panel.addView(choice, position);
+            list.addView(choice, position);
             choices[i] = choice;
         }
         TextView back = text("Retour : fermer la playlist", 12);

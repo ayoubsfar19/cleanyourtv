@@ -47,6 +47,7 @@ public final class TizenNightService extends Service {
     private FrameLayout root;
     private NightMode night;
     private NightWidgets widgets;
+    private AdhkarOverlay adhkar;
     private NightOverlayState state;
     private List<NightLibrary.Entry> entries;
     private boolean attached, receiverRegistered, ending;
@@ -171,6 +172,7 @@ public final class TizenNightService extends Service {
         videoLayer.setVisibility(View.GONE);
         root.addView(videoLayer, new FrameLayout.LayoutParams(-1, -1));
         widgets = new NightWidgets(this, root);
+        adhkar = new AdhkarOverlay(this, root);
         String[] labels = new String[entries.size()];
         for (int i = 0; i < entries.size(); i++) labels[i] = entries.get(i).title;
         NightMode.Playback playback = new NightMode.Playback() {
@@ -203,6 +205,7 @@ public final class TizenNightService extends Service {
         receiverRegistered = true;
         quietVolume();
         widgets.start();
+        adhkar.start();
         night.start();
         main.postDelayed(() -> {
             if (!ending && !state.playerSeen()) {
@@ -217,6 +220,7 @@ public final class TizenNightService extends Service {
     private void launchVideo(int index) {
         if (ending || entries == null || index < 0 || index >= entries.size()) return;
         String id = entries.get(index).id;
+        if (adhkar != null) adhkar.select(id);
         if (id == null || !id.matches("[A-Za-z0-9_-]{11}")) {
             failToHome("Cette vidéo est indisponible. Choisissez une autre ambiance.");
             return;
@@ -302,10 +306,12 @@ public final class TizenNightService extends Service {
         boolean removeReceiver = receiverRegistered, removeWindow = attached;
         NightMode oldNight = night;
         NightWidgets oldWidgets = widgets;
+        AdhkarOverlay oldAdhkar = adhkar;
         FrameLayout oldRoot = root;
         receiverRegistered = attached = false;
         night = null;
         widgets = null;
+        adhkar = null;
         root = null;
         state = null;
         entries = null;
@@ -320,6 +326,7 @@ public final class TizenNightService extends Service {
             if (removeReceiver) attemptCleanup(() -> unregisterReceiver(screenOff));
             if (oldNight != null) attemptCleanup(oldNight::detach);
             if (oldWidgets != null) attemptCleanup(oldWidgets::stop);
+            if (oldAdhkar != null) attemptCleanup(oldAdhkar::stop);
             if (removeWindow && oldRoot != null) {
                 attemptCleanup(() -> windowManager.removeViewImmediate(oldRoot));
             }

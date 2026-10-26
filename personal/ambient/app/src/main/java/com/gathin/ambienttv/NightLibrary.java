@@ -12,9 +12,10 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Four owner-selected native video sources, kept separate from the photo collection. */
+/** Owner-selected video sources, kept separate from the photo collection. */
 final class NightLibrary {
     static final String FOLDER = "night-videos", CONFIG = "night-videos.json";
+    static final int MAX_VIDEOS = 50;
     private static final String[] IDS = {"7_Wbmy79wxQ", "BVdHrTfO2PE", "yTRHheKoVhY", "BUeCNBg_qYk"};
     private static final String[] TITLES = {"The Art Corner · 1", "The Art Corner · 2",
             "Bedroom R&B · 1", "Bedroom R&B · 2"};
@@ -53,6 +54,23 @@ final class NightLibrary {
         if (raw == null || raw.length() > 65_536) return result;
         try {
             JSONObject config = new JSONObject(raw.startsWith("\uFEFF") ? raw.substring(1) : raw);
+            if (config.optInt("version", 0) == 2) {
+                JSONArray videos = config.optJSONArray("videos");
+                if (videos == null || videos.length() == 0 || videos.length() > MAX_VIDEOS) return result;
+                List<Entry> dynamic = new ArrayList<>();
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                for (int row = 0; row < videos.length(); row++) {
+                    JSONObject video = videos.optJSONObject(row);
+                    if (video == null) return result;
+                    String id = video.optString("id", "");
+                    String title = video.optString("title", "").trim();
+                    if (!validId(id) || !validTitle(title) || !seen.add(id)) return result;
+                    File file = null;
+                    for (Entry old : result) if (old.id.equals(id)) file = old.file;
+                    dynamic.add(new Entry(id, title, file, ""));
+                }
+                return dynamic;
+            }
             if (config.optInt("version", 0) != 1) return result;
             JSONArray videos = config.optJSONArray("videos");
             if (videos == null || videos.length() > 4) return result;
@@ -73,6 +91,23 @@ final class NightLibrary {
             }
         } catch (Exception ignored) { /* Invalid configuration cannot break the photo screensaver. */ }
         return result;
+    }
+
+    static boolean validId(String id) { return id != null && id.matches("[A-Za-z0-9_-]{11}"); }
+
+    static boolean validTitle(String title) {
+        return title != null && !title.trim().isEmpty() && title.length() <= 100
+                && !title.matches("(?s).*[\\p{Cntrl}].*");
+    }
+
+    static String playlistJson(List<Entry> entries) throws org.json.JSONException {
+        if (entries.isEmpty() || entries.size() > MAX_VIDEOS) throw new IllegalArgumentException("Liste invalide");
+        JSONArray videos = new JSONArray();
+        for (Entry entry : entries) {
+            if (!validId(entry.id) || !validTitle(entry.title)) throw new IllegalArgumentException("Vidéo invalide");
+            videos.put(new JSONObject().put("id", entry.id).put("title", entry.title));
+        }
+        return new JSONObject().put("version", 2).put("videos", videos).toString();
     }
 
     static String directUrl(String value) {
