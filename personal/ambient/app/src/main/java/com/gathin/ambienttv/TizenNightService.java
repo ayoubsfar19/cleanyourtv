@@ -32,7 +32,7 @@ import java.util.List;
 
 /** Explicit, non-sticky widgets and controls above the user's installed TizenTube player. */
 public final class TizenNightService extends Service {
-    static final String TIZEN = "io.gh.reisxd.tizentube.cobalt";
+    static final String TIZEN = "com.gathin.tizennight";
     static final String EXTRA_INDEX = "index";
     private static final String ACTION_EXIT = "com.gathin.ambienttv.NIGHT_PHOTOS";
     private static final String CHANNEL = "night_mode";
@@ -50,6 +50,7 @@ public final class TizenNightService extends Service {
     private NightOverlayState state;
     private List<NightLibrary.Entry> entries;
     private boolean attached, receiverRegistered, ending;
+    private boolean playerLaunched;
     private int previousVolume = -1, ownVolume = -1;
 
     private final BroadcastReceiver screenOff = new BroadcastReceiver() {
@@ -123,16 +124,20 @@ public final class TizenNightService extends Service {
             recoverVolume(this);
             showForegroundNotification();
             if (!Settings.canDrawOverlays(this)) {
-                failToPhotos("Autorisez l’affichage au-dessus des applications pour le mode nuit.");
+                failToHome("Autorisez l’affichage au-dessus des applications pour le mode nuit.");
                 return START_NOT_STICKY;
             }
             if (!HomeBackService.connected()) {
-                failToPhotos("Activez le raccourci Retour dans les options du mode nuit, puis réessayez.");
+                failToHome("Activez le raccourci Retour dans les options du mode nuit, puis réessayez.");
+                return START_NOT_STICKY;
+            }
+            if (!getSharedPreferences("night-guest", MODE_PRIVATE).getBoolean("confirmed", false)) {
+                failToHome("Choisissez Invité dans TizenTube Nuit avant de démarrer.");
                 return START_NOT_STICKY;
             }
             startOverlay(intent.getIntExtra(EXTRA_INDEX, 0));
         } catch (RuntimeException failure) {
-            failToPhotos("Impossible d’ouvrir le mode nuit. Vérifiez les autorisations puis réessayez.");
+            failToHome("Impossible d’ouvrir le mode nuit. Vérifiez les autorisations puis réessayez.");
         }
         return START_NOT_STICKY;
     }
@@ -178,6 +183,7 @@ public final class TizenNightService extends Service {
             @Override public void onEnter() { }
             @Override public void onExit() { if (!ending) finishSession(true); }
         }, labels);
+        night.setExitLabel("Accueil");
         WindowManager.LayoutParams position = new WindowManager.LayoutParams(-1, -1,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
@@ -212,17 +218,19 @@ public final class TizenNightService extends Service {
         if (ending || entries == null || index < 0 || index >= entries.size()) return;
         String id = entries.get(index).id;
         if (id == null || !id.matches("[A-Za-z0-9_-]{11}")) {
-            failToPhotos("Cette vidéo est indisponible. Choisissez une autre ambiance.");
+            failToHome("Cette vidéo est indisponible. Choisissez une autre ambiance.");
             return;
         }
         Intent player = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + id))
                 .setPackage(TIZEN)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | (playerLaunched
+                        ? Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        : Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NO_HISTORY));
         try {
             startActivity(player);
+            playerLaunched = true;
         } catch (ActivityNotFoundException | SecurityException failure) {
-            failToPhotos("Impossible d’ouvrir TizenTube. Vérifiez que l’application est installée.");
+            failToHome("Installez TizenTube Nuit et gardez cette copie en mode Invité.");
         }
     }
 
@@ -240,7 +248,7 @@ public final class TizenNightService extends Service {
         Notification notification = new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.icon)
                 .setContentTitle("Mode nuit")
-                .setContentText("TizenTube · horloge et météo. Touchez pour revenir aux photos.")
+                .setContentText("TizenTube Nuit · Session séparée. Revenir à l’accueil.")
                 .setContentIntent(exit)
                 .setCategory(Notification.CATEGORY_SERVICE)
                 .setOnlyAlertOnce(true)
@@ -285,9 +293,9 @@ public final class TizenNightService extends Service {
                 .remove(VOLUME_BEFORE).remove(VOLUME_APPLIED).apply();
     }
 
-    private void finishSession(boolean returnToPhotos) {
+    private void finishSession(boolean returnToHome) {
         if (ending) return;
-        boolean pausePlayer = returnToPhotos && state != null && state.canPausePlayer();
+        boolean pausePlayer = returnToHome && state != null && state.canPausePlayer();
         ending = true;
         if (running == this) running = null;
         // Clear ownership before calling code that can synchronously reenter this service.
@@ -320,13 +328,13 @@ public final class TizenNightService extends Service {
             attemptCleanup(() -> stopForeground(STOP_FOREGROUND_REMOVE));
             attemptCleanup(this::stopSelf);
         }
-        if (returnToPhotos) {
+        if (returnToHome) {
             try {
-                startActivity(new Intent(this, SlideshowActivity.class)
+                startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
                                 | Intent.FLAG_ACTIVITY_SINGLE_TOP));
             } catch (RuntimeException ignored) {
-                attemptCleanup(() -> Toast.makeText(this, "Impossible d’ouvrir les photos", Toast.LENGTH_SHORT).show());
+                attemptCleanup(() -> Toast.makeText(this, "Impossible d’ouvrir l’accueil", Toast.LENGTH_SHORT).show());
             }
         }
     }
@@ -336,7 +344,7 @@ public final class TizenNightService extends Service {
         catch (RuntimeException ignored) { /* Every other teardown step must still be attempted. */ }
     }
 
-    private void failToPhotos(String message) {
+    private void failToHome(String message) {
         try { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
         finally { finishSession(true); }
     }

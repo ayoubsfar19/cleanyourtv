@@ -89,4 +89,4 @@ If Netflix shares no rows, a dated public global Top10 feed supplies text cards;
 
 The combined installer updates Photos, grants optional TV/Wi-Fi permissions, installs the separate Home preview and exports package counts only to `private/recommendation-status.txt`. Default Home is kept until `activate-personal-home.ps1` is run after physical testing. `restore-personal-home.ps1` restores the original Home component. Original launcher private settings are retained in the original app, not silently copied from inaccessible storage. The preview starts with the four dock apps from the provided screen: Netflix, TizenTube, Kick and TOD; other installed apps remain in the library/grid.
 
-The optional TizenTube Night mode has its own [setup and remote controls](README-night.md). It streams the selected videos in the installed TizenTube app beneath the ambient widgets; no MP4 downloads are needed.
+The optional TizenTube Night mode has its own [setup and remote controls](README-night.md). It streams selected videos in a separate signed-out TizenTube Nuit copy beneath the ambient widgets; no MP4 downloads are needed.

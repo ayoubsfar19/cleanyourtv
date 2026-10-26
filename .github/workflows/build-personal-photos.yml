@@ -6,7 +6,7 @@ on:
         description: Preview release tag
         required: true
       bundle_blob_sha:
-        description: Git blob containing the tested public ZIP
+        description: Git blob containing the tested ZIP or its chunk manifest
         required: true
       bundle_sha256:
         description: SHA-256 of the tested ZIP
@@ -32,12 +32,29 @@ jobs:
           blob=json.loads(subprocess.check_output(['gh','api','repos/'+os.environ['GH_REPO']+'/git/blobs/'+sha]))
           assert blob['encoding']=='base64'
           raw=base64.b64decode(''.join(blob['content'].split()),validate=True)
+          if raw.startswith(b'{'):
+              manifest=json.loads(raw)
+              assert manifest['kind']=='chunked-bundle-v1'
+              assert 0 < manifest['size'] <= 100*1024*1024
+              assert 0 < len(manifest['chunks']) <= 32
+              assembled=bytearray()
+              for part in manifest['chunks']:
+                  assert re.fullmatch('[0-9a-f]{40}',part['sha'])
+                  item=json.loads(subprocess.check_output(['gh','api','repos/'+os.environ['GH_REPO']+'/git/blobs/'+part['sha']]))
+                  data=base64.b64decode(''.join(item['content'].split()),validate=True)
+                  assert len(data)==part['size']
+                  assert hashlib.sha256(data).hexdigest()==part['sha256']
+                  assembled.extend(data)
+              assert len(assembled)==manifest['size']
+              raw=bytes(assembled)
           assert hashlib.sha256(raw).hexdigest()==os.environ['BUNDLE_SHA256']
           path=pathlib.Path('photos-football-preview.zip')
           path.write_bytes(raw)
           with zipfile.ZipFile(path) as z:
               for name in ['photos-football-preview.apk','home-personnel-preview.apk','SHA256SUMS.txt']:
                   pathlib.Path(name).write_bytes(z.read(name))
+              if 'tizentube-night.apk' in z.namelist():
+                  pathlib.Path('tizentube-night.apk').write_bytes(z.read('tizentube-night.apk'))
           print('Tested public bundle verified; no signing key included.')
           PY
       - name: Publish preview downloads
@@ -47,5 +64,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           [[ "$RELEASE_TAG" =~ ^photos-football-v[0-9.]+-preview$ ]]
-          gh release upload "$RELEASE_TAG" photos-football-preview.zip photos-football-preview.apk home-personnel-preview.apk SHA256SUMS.txt --clobber
+          assets=(photos-football-preview.zip photos-football-preview.apk home-personnel-preview.apk SHA256SUMS.txt)
+          if [[ -f tizentube-night.apk ]]; then assets+=(tizentube-night.apk); fi
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
           gh release edit "$RELEASE_TAG" --draft=false --prerelease

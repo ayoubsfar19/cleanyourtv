@@ -21,7 +21,7 @@ public final class NightAccessActivity extends Activity {
     private final Handler main = new Handler(Looper.getMainLooper());
     private boolean launched, waitingForHelper, resumed;
     private int helperChecks;
-    private TextView message, allowOverlay, allowHelper, begin;
+    private TextView message, allowOverlay, allowHelper, openGuest, begin;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -42,9 +42,16 @@ public final class NightAccessActivity extends Activity {
                         Uri.parse("package:" + getPackageName()))));
         allowHelper = button("Activer « " + getString(R.string.home_back_label) + " »", () -> openSettings(
                 new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
-        begin = button("Démarrer", this::tryStart);
+        openGuest = button("Ouvrir TizenTube Nuit", this::openGuestPlayer);
+        begin = button("Démarrer", () -> {
+            if (nightInstalled() && !guestConfirmed()) {
+                getSharedPreferences("night-guest", MODE_PRIVATE).edit().putBoolean("confirmed", true).apply();
+            }
+            tryStart();
+        });
         panel.addView(allowOverlay);
         panel.addView(allowHelper);
+        panel.addView(openGuest);
         panel.addView(begin);
         panel.addView(button("Retour aux photos", this::returnToPhotos));
         setContentView(panel);
@@ -64,6 +71,26 @@ public final class NightAccessActivity extends Activity {
 
     private void tryStart() {
         if (launched || isFinishing() || !resumed) return;
+        if (!nightInstalled()) {
+            allowOverlay.setVisibility(View.GONE);
+            allowHelper.setVisibility(View.GONE);
+            openGuest.setVisibility(View.GONE);
+            begin.setVisibility(View.GONE);
+            message.setText("Installez TizenTube Nuit pour utiliser une session séparée de votre compte habituel.");
+            return;
+        }
+        if (!guestConfirmed()) {
+            allowOverlay.setVisibility(View.GONE);
+            allowHelper.setVisibility(View.GONE);
+            openGuest.setVisibility(View.VISIBLE);
+            begin.setText("J’ai choisi Invité — continuer");
+            begin.setVisibility(View.VISIBLE);
+            message.setText("Ouvrez TizenTube Nuit et choisissez Invité / Watch as guest. Ne connectez aucun compte dans cette copie. Revenez ensuite ici pour continuer.");
+            openGuest.requestFocus();
+            return;
+        }
+        openGuest.setVisibility(View.GONE);
+        begin.setText("Démarrer");
         boolean overlay = Settings.canDrawOverlays(this);
         boolean helper = HomeBackService.connected();
         if (overlay && !helper && helperEnabled() && helperChecks++ < 8) {
@@ -104,6 +131,26 @@ public final class NightAccessActivity extends Activity {
             }
         } catch (RuntimeException ignored) { }
         return false;
+    }
+
+    private boolean guestConfirmed() {
+        return getSharedPreferences("night-guest", MODE_PRIVATE).getBoolean("confirmed", false);
+    }
+
+    private boolean nightInstalled() {
+        try { return getPackageManager().getApplicationInfo(TizenNightService.TIZEN, 0).enabled; }
+        catch (android.content.pm.PackageManager.NameNotFoundException ignored) { return false; }
+    }
+
+    private void openGuestPlayer() {
+        Intent intent = getPackageManager().getLeanbackLaunchIntentForPackage(TizenNightService.TIZEN);
+        if (intent == null) intent = getPackageManager().getLaunchIntentForPackage(TizenNightService.TIZEN);
+        if (intent == null) {
+            message.setText("TizenTube Nuit est introuvable. Installez la copie dédiée au mode nuit.");
+            return;
+        }
+        try { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
+        catch (RuntimeException unavailable) { message.setText("Impossible d’ouvrir TizenTube Nuit."); }
     }
 
     private void openSettings(Intent intent) {

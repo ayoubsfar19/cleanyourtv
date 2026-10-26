@@ -6,7 +6,7 @@ import static org.junit.Assert.*;
 
 public class NightOverlayStateTest {
     private static final String OWN = "com.gathin.ambienttv";
-    private static final String PLAYER = "io.gh.reisxd.tizentube.cobalt";
+    private static final String PLAYER = "com.gathin.tizennight";
 
     @Test public void startupCannotPauseAnUnobservedPlayer() {
         NightOverlayState state = new NightOverlayState(OWN, PLAYER);
@@ -59,6 +59,13 @@ public class NightOverlayStateTest {
         assertFalse(state.window(PLAYER, "dev.cobalt.app.MainActivity"));
         assertTrue(state.playerSeen());
         assertTrue(state.canPausePlayer());
+    }
+
+    @Test public void signedInNormalPlayerIsNeverTheNightPlayer() {
+        assertEquals(PLAYER, TizenNightService.TIZEN);
+        NightOverlayState state = playing();
+        assertTrue(state.window("io.gh.reisxd.tizentube.cobalt", "dev.cobalt.app.MainActivity"));
+        assertFalse(state.canPausePlayer());
     }
 
     private NightOverlayState playing() {

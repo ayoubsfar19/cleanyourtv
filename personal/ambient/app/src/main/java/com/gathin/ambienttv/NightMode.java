@@ -176,6 +176,11 @@ final class NightMode {
     boolean isActive() { return active; }
     boolean ownsPhotoKeys() { return active || moon.hasFocus(); }
 
+    void setExitLabel(String label) {
+        photosButton.setText(label);
+        photosButton.setContentDescription(label);
+    }
+
     /** Optional host handoff: opening another activity leaves this controller inactive. */
     void setEntryAction(Runnable action) { entryAction = action; }
 
